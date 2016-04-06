@@ -32,5 +32,7 @@ add_definitions(${PCL_DEFINITIONS})
 
 
 add_executable(kitti_player src/kitti_player.cpp)
-
 target_link_libraries(kitti_player ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
+add_executable(kitti_static_transform_broadcaster src/kitti_static_transform_broadcaster.cpp)
+target_link_libraries(kitti_static_transform_broadcaster ${catkin_LIBRARIES})
