@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
                     geometry_msgs
                     cv_bridge
                     image_transport
+                    geodesy
 )
 
 find_package(PCL 1.7 REQUIRED)

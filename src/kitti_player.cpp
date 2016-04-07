@@ -45,6 +45,8 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <nav_msgs/Odometry.h>
+#include <geodesy/utm.h>
 #include <sstream>
 #include <string>
 #include <tf/LinearMath/Transform.h>
@@ -67,11 +69,13 @@ struct kitti_player_options
     bool    velodyne;       // publish velodyne point clouds /as PCL
     bool    gps;            // publish GPS sensor_msgs/NavSatFix    message
     bool    imu;            // publish IMU sensor_msgs/Imu message
+    bool    odometry;       // publish GPS and IMU as nav_msgs/Odometry message
     bool    grayscale;      // publish
     bool    color;          // publish
     bool    viewer;         // enable CV viewer
     bool    timestamps;     // use KITTI timestamps;
     string  frame_oxts;     // frame_id for frame attached to oxts
+    string  frame_odom;     // frame_id for frame used to publish odometry messages
     string  frame_velodyne; // frame_id for frame attached to velodyne
     string  frame_image00;  // frame_id for frame attached to camera 00
     string  frame_image01;  // frame_id for frame attached to camera 01
@@ -303,6 +307,76 @@ int getIMU(string filename, sensor_msgs::Imu *ros_msgImu, std_msgs::Header *head
     return 1;
 }
 
+int getOdomTf(string filename, nav_msgs::Odometry *ros_msgOdom, tf::Transform *t, std_msgs::Header *header)
+{
+    static tf::Transform origin;
+    static bool first = true;
+
+    ifstream file_oxts(filename.c_str());
+    if (!file_oxts.is_open())
+    {
+        ROS_ERROR_STREAM("Fail to open " << filename);
+        return 0;
+    }
+
+    ROS_DEBUG_STREAM("Reading IMU data from oxts file: " << filename );
+
+    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+    boost::char_separator<char> sep{" "};
+
+    string line="";
+
+    getline(file_oxts,line);
+    tokenizer tok(line,sep);
+    vector<string> s(tok.begin(), tok.end());
+
+    //    - roll:    roll angle (rad),  0 = level, positive = left side up (-pi..pi)
+    //    - pitch:   pitch angle (rad), 0 = level, positive = front down (-pi/2..pi/2)
+    //    - yaw:     heading (rad),     0 = east,  positive = counter clockwise (-pi..pi)
+    tf::Quaternion q=tf::createQuaternionFromRPY(   boost::lexical_cast<double>(s[3]),
+                                                    boost::lexical_cast<double>(s[4]),
+                                                    boost::lexical_cast<double>(s[5])
+                                                    );
+    //    - lat:     latitude of the oxts-unit (deg)
+    //    - lon:     longitude of the oxts-unit (deg)
+    //    - alt:     altitude of the oxts-unit (m)
+    geodesy::UTMPoint utmP(geodesy::toMsg(   boost::lexical_cast<double>(s[0]),
+                                             boost::lexical_cast<double>(s[1]),
+                                             boost::lexical_cast<double>(s[2])
+                                             ));
+
+    // set a transform from utm and orientation
+    t->setOrigin(tf::Vector3(utmP.easting, utmP.northing, utmP.altitude));
+    t->setRotation(q);
+
+    // Initialize origin
+    if(first)
+    {
+        origin = *t;
+        first = false;
+    }
+
+    // Put transform in origin frame
+    // *t *= origin.inverse();
+    *t = origin.inverse() * (*t);
+
+    // fill up the odometry msg
+    ros_msgOdom->header.frame_id = header->frame_id;
+    ros_msgOdom->header.stamp = header->stamp;
+
+    ros_msgOdom->pose.pose.position.x = t->getOrigin().getX();
+    ros_msgOdom->pose.pose.position.y = t->getOrigin().getY();
+    ros_msgOdom->pose.pose.position.z = t->getOrigin().getZ();
+
+    ros_msgOdom->pose.pose.orientation.x = t->getRotation().getX();
+    ros_msgOdom->pose.pose.orientation.y = t->getRotation().getY();
+    ros_msgOdom->pose.pose.orientation.z = t->getRotation().getZ();
+    ros_msgOdom->pose.pose.orientation.w = t->getRotation().getW();
+
+    return 1;
+}
+
+
 std_msgs::Header parseTime(string timestamp)
 {
     //Epoch time conversion
@@ -346,11 +420,13 @@ int main(int argc, char **argv)
         ("velodyne  ,v   ",  po::value<bool> (&options.velodyne)      ->implicit_value(1) ->default_value(0)  ,  "replay Velodyne data")
         ("gps       ,g   ",  po::value<bool> (&options.gps)           ->implicit_value(1) ->default_value(0)  ,  "replay Gps data")
         ("imu       ,i   ",  po::value<bool> (&options.imu)           ->implicit_value(1) ->default_value(0)  ,  "replay Imu data")
+        ("odometry  ,o   ",  po::value<bool> (&options.odometry)      ->implicit_value(1) ->default_value(0)  ,  "replay Gps and Imu data as odometry")
         ("grayscale ,G   ",  po::value<bool> (&options.grayscale)     ->implicit_value(1) ->default_value(0)  ,  "replay Stereo Grayscale images")
         ("color     ,C   ",  po::value<bool> (&options.color)         ->implicit_value(1) ->default_value(0)  ,  "replay Stereo Color images")
         ("viewer         ",  po::value<bool> (&options.viewer)        ->implicit_value(1) ->default_value(0)  ,  "enable image viewer")
         ("timestamps,T   ",  po::value<bool> (&options.timestamps)    ->implicit_value(1) ->default_value(0)  ,  "use KITTI timestamps")
         ("frame_oxts     ",  po::value<string>(&options.frame_oxts)->default_value("oxts")                  ,  "name of frame attached to oxts")
+        ("frame_odom     ",  po::value<string>(&options.frame_odom)->default_value("odom")                  ,  "name of frame used to publish odometry messages")
         ("frame_velodyne ",  po::value<string>(&options.frame_velodyne)->default_value("velodyne")          ,  "name of frame attached to velodyne")
         ("frame_image00  ",  po::value<string>(&options.frame_image00)->default_value("image00")            ,  "name of frame attached to camera 00")
         ("frame_image01  ",  po::value<string>(&options.frame_image01)->default_value("image01")            ,  "name of frame attached to camera 01")
@@ -448,9 +524,13 @@ int main(int argc, char **argv)
     ros::Publisher map_pub = node.advertise<pcl::PointCloud<pcl::PointXYZ> > ("hdl64e", 1, true);
     ros::Publisher gps_pub = node.advertise<sensor_msgs::NavSatFix>  ("oxts/gps", 1, true);
     ros::Publisher imu_pub = node.advertise<sensor_msgs::Imu>  ("oxts/imu", 1, true);
+    ros::Publisher odom_pub = node.advertise<nav_msgs::Odometry>  ("odometry", 1, true);
+    tf::TransformBroadcaster tf_br;
 
     sensor_msgs::NavSatFix ros_msgGpsFix;
     sensor_msgs::Imu ros_msgImu;
+    nav_msgs::Odometry ros_msgOdom;
+    tf::Transform ros_tfOdom;
 
     if (vm.count("help")) {
         cout << desc << endl;
@@ -527,6 +607,8 @@ int main(int argc, char **argv)
             (options.imu        && (   (opendir(dir_oxts.c_str())               == NULL)))
             ||
             (options.gps        && (   (opendir(dir_oxts.c_str())               == NULL)))
+            ||
+            (options.odometry   && (   (opendir(dir_oxts.c_str())               == NULL)))
             ||
             (options.velodyne   && (   (opendir(dir_velodyne_points.c_str())    == NULL)))
             ||
@@ -986,6 +1068,42 @@ int main(int argc, char **argv)
             }
             imu_pub.publish(ros_msgImu);
 
+        }
+
+        if(options.odometry || options.all_data)
+        {
+            header_support.frame_id = options.frame_odom;
+            header_support.stamp = current_timestamp; //ros::Time::now();
+            if (options.timestamps)
+            {
+                str_support = dir_timestamp_oxts + "timestamps.txt";
+                ifstream timestamps(str_support.c_str());
+                if (!timestamps.is_open())
+                {
+                    ROS_ERROR_STREAM("Fail to open " << timestamps);
+                    node.shutdown();
+                    return 1;
+                }
+                timestamps.seekg(30*entries_played);
+                getline(timestamps,str_support);
+                header_support.stamp = parseTime(str_support).stamp;
+            }
+
+            full_filename_oxts = dir_oxts + boost::str(boost::format("%010d") % entries_played ) + ".txt";
+            if (!getOdomTf(full_filename_oxts,&ros_msgOdom,&ros_tfOdom,&header_support))
+            {
+                ROS_ERROR_STREAM("Fail to open " << full_filename_oxts);
+                node.shutdown();
+                return 1;
+            }
+
+            ros_msgOdom.child_frame_id = options.frame_oxts;
+            odom_pub.publish(ros_msgOdom);
+            tf_br.sendTransform(tf::StampedTransform(   ros_tfOdom, 
+                                                        ros_msgOdom.header.stamp,
+                                                        ros_msgOdom.header.frame_id,
+                                                        ros_msgOdom.child_frame_id
+                                                        ));
         }
 
         ++progress;
