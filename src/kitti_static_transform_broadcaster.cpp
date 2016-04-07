@@ -195,9 +195,13 @@ int main(int argc, char ** argv)
       return -1;
     }
 
+    tf2::Transform tf;
+    tf2::convert(msg.transform,tf);
+    tf2::convert(tf.inverse(),msg.transform);
+
     msg.header.stamp = ros::Time::now();
-    msg.child_frame_id = argv[2];
-    msg.header.frame_id = argv[3];
+    msg.header.frame_id = argv[2];
+    msg.child_frame_id = argv[3];
 
     broadcaster.sendTransform(msg);
     ROS_INFO("Spinning until killed publishing %s to %s", msg.child_frame_id.c_str(), msg.header.frame_id.c_str());
@@ -247,7 +251,7 @@ int main(int argc, char ** argv)
   }
   else
   {
-    printf("A command line utility for manually sending a transform.\n");
+    printf("A command line utility for manually sending a transform from a kitti calibration file.\n");
     //printf("It will periodicaly republish the given transform. \n");
     printf("Usage: kitti_static_transform_publisher calib_X_to_Y.txt frame_id_X frame_id_Y \n");
     printf("OR \n");
