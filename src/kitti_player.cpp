@@ -8,6 +8,9 @@
  * KITTI_PLAYER v2.
  *
  * Augusto Luis Ballardini, ballardini@disco.unimib.it
+ * 
+ * Some functionalities by:
+ * Ellon Paiva Mendes, ellonpaiva@gmail.com
  *
  * https://github.com/iralabdisco/kitti_player
  *
@@ -62,12 +65,17 @@ struct kitti_player_options
     bool    all_data;       // publish everything
     bool    velodyne;       // publish velodyne point clouds /as PCL
     bool    gps;            // publish GPS sensor_msgs/NavSatFix    message
-    bool    imu;            // publish IMU sensor_msgs/Imu Message  message
+    bool    imu;            // publish IMU sensor_msgs/Imu message
     bool    grayscale;      // publish
     bool    color;          // publish
     bool    viewer;         // enable CV viewer
     bool    timestamps;     // use KITTI timestamps;
-    bool    sendTransform;  // publish velodyne TF IMU 3DOF orientation wrt fixed frame
+    string  frame_oxts;     // frame_id for frame attached to oxts
+    string  frame_velodyne; // frame_id for frame attached to velodyne
+    string  frame_image00;  // frame_id for frame attached to camera 00
+    string  frame_image01;  // frame_id for frame attached to camera 01
+    string  frame_image02;  // frame_id for frame attached to camera 02
+    string  frame_image03;  // frame_id for frame attached to camera 03
 };
 
 int publish_velodyne(ros::Publisher &pub, string infile, std_msgs::Header *header)
@@ -97,7 +105,7 @@ int publish_velodyne(ros::Publisher &pub, string infile, std_msgs::Header *heade
         //workaround for the PCL headers... http://wiki.ros.org/hydro/Migration#PCL
         sensor_msgs::PointCloud2 pc2;
 
-        pc2.header.frame_id= "base_link"; //ros::this_node::getName();
+        pc2.header.frame_id= header->frame_id;
         pc2.header.stamp=header->stamp;
         points->header = pcl_conversions::toPCL(pc2.header);
         pub.publish(points);
@@ -221,7 +229,7 @@ int getGPS(string filename, sensor_msgs::NavSatFix *ros_msgGpsFix, std_msgs::Hea
     tokenizer tok(line,sep);
     vector<string> s(tok.begin(), tok.end());
 
-    ros_msgGpsFix->header.frame_id = ros::this_node::getName();
+    ros_msgGpsFix->header.frame_id = header->frame_id;
     ros_msgGpsFix->header.stamp = header->stamp;
 
     ros_msgGpsFix->latitude  = boost::lexical_cast<double>(s[0]);
@@ -262,7 +270,7 @@ int getIMU(string filename, sensor_msgs::Imu *ros_msgImu, std_msgs::Header *head
     tokenizer tok(line,sep);
     vector<string> s(tok.begin(), tok.end());
 
-    ros_msgImu->header.frame_id = ros::this_node::getName();
+    ros_msgImu->header.frame_id = header->frame_id;
     ros_msgImu->header.stamp = header->stamp;
 
     //    - ax:      acceleration in x, i.e. in direction of vehicle front (m/s^2)
@@ -330,17 +338,23 @@ int main(int argc, char **argv)
 
     po::options_description desc("Kitti_player, a player for KITTI raw datasets\nDatasets can be downloaded from: http://www.cvlibs.net/datasets/kitti/raw_data.php\n\nAllowed options",200);
     desc.add_options()
-        ("help,h"                                                                                          ,  "help message")
-        ("directory ,d",  po::value<string>(&options.path)->required()                                     ,  "*required* - path to the kitti dataset Directory")
-        ("frequency ,f",  po::value<float>(&options.frequency)     ->default_value(1.0)                    ,  "set replay Frequency")
-        ("all       ,a",  po::value<bool> (&options.all_data)      ->implicit_value(1) ->default_value(0)  ,  "replay All data")
-        ("velodyne  ,v",  po::value<bool> (&options.velodyne)      ->implicit_value(1) ->default_value(0)  ,  "replay Velodyne data")
-        ("gps       ,g",  po::value<bool> (&options.gps)           ->implicit_value(1) ->default_value(0)  ,  "replay Gps data")
-        ("imu       ,i",  po::value<bool> (&options.imu)           ->implicit_value(1) ->default_value(0)  ,  "replay Imu data")
-        ("grayscale ,G",  po::value<bool> (&options.grayscale)     ->implicit_value(1) ->default_value(0)  ,  "replay Stereo Grayscale images")
-        ("color     ,C",  po::value<bool> (&options.color)         ->implicit_value(1) ->default_value(0)  ,  "replay Stereo Color images")
-        ("viewer      ",  po::value<bool> (&options.viewer)        ->implicit_value(1) ->default_value(0)  ,  "enable image viewer")
-        ("timestamps,T",  po::value<bool> (&options.timestamps)    ->implicit_value(1) ->default_value(0)  ,  "use KITTI timestamps")
+        ("help,h         "                                                                                    ,  "help message")
+        ("directory ,d   ",  po::value<string>(&options.path)->required()                                     ,  "*required* - path to the kitti dataset Directory")
+        ("frequency ,f   ",  po::value<float>(&options.frequency)     ->default_value(10.0)                   ,  "set replay Frequency")
+        ("all       ,a   ",  po::value<bool> (&options.all_data)      ->implicit_value(1) ->default_value(0)  ,  "replay All data")
+        ("velodyne  ,v   ",  po::value<bool> (&options.velodyne)      ->implicit_value(1) ->default_value(0)  ,  "replay Velodyne data")
+        ("gps       ,g   ",  po::value<bool> (&options.gps)           ->implicit_value(1) ->default_value(0)  ,  "replay Gps data")
+        ("imu       ,i   ",  po::value<bool> (&options.imu)           ->implicit_value(1) ->default_value(0)  ,  "replay Imu data")
+        ("grayscale ,G   ",  po::value<bool> (&options.grayscale)     ->implicit_value(1) ->default_value(0)  ,  "replay Stereo Grayscale images")
+        ("color     ,C   ",  po::value<bool> (&options.color)         ->implicit_value(1) ->default_value(0)  ,  "replay Stereo Color images")
+        ("viewer         ",  po::value<bool> (&options.viewer)        ->implicit_value(1) ->default_value(0)  ,  "enable image viewer")
+        ("timestamps,T   ",  po::value<bool> (&options.timestamps)    ->implicit_value(1) ->default_value(0)  ,  "use KITTI timestamps")
+        ("frame_oxts     ",  po::value<string>(&options.frame_oxts)->default_value("oxts")                  ,  "name of frame attached to oxts")
+        ("frame_velodyne ",  po::value<string>(&options.frame_velodyne)->default_value("velodyne")          ,  "name of frame attached to velodyne")
+        ("frame_image00  ",  po::value<string>(&options.frame_image00)->default_value("image00")            ,  "name of frame attached to camera 00")
+        ("frame_image01  ",  po::value<string>(&options.frame_image01)->default_value("image01")            ,  "name of frame attached to camera 01")
+        ("frame_image02  ",  po::value<string>(&options.frame_image02)->default_value("image02")            ,  "name of frame attached to camera 02")
+        ("frame_image03  ",  po::value<string>(&options.frame_image03)->default_value("image03")            ,  "name of frame attached to camera 03")
     ;
 
     try // parse options
@@ -423,7 +437,6 @@ int main(int argc, char **argv)
     sensor_msgs::Image ros_msg02;
     sensor_msgs::Image ros_msg03;
 
-//    sensor_msgs::CameraInfo ros_cameraInfoMsg;
     sensor_msgs::CameraInfo ros_cameraInfoMsg_camera00;
     sensor_msgs::CameraInfo ros_cameraInfoMsg_camera01;
     sensor_msgs::CameraInfo ros_cameraInfoMsg_camera02;
@@ -551,6 +564,8 @@ int main(int argc, char **argv)
     }
     else
     {
+        // sync datasets have the same number of elements on each folder, so
+        // we just count one of them.
         bool done=false;
         if (!done && options.color)
         {
@@ -653,28 +668,28 @@ int main(int argc, char **argv)
     // CAMERA INFO SECTION: read one for all
 
     ros_cameraInfoMsg_camera00.header.stamp = ros::Time::now();
-    ros_cameraInfoMsg_camera00.header.frame_id = ros::this_node::getName();
+    ros_cameraInfoMsg_camera00.header.frame_id = options.frame_image00;
     ros_cameraInfoMsg_camera00.height = 0;
     ros_cameraInfoMsg_camera00.width  = 0;
     //ros_cameraInfoMsg_camera00.D.resize(5);
     //ros_cameraInfoMsg_camera00.distortion_model=sensor_msgs::distortion_models::PLUMB_BOB;
 
     ros_cameraInfoMsg_camera01.header.stamp = ros::Time::now();
-    ros_cameraInfoMsg_camera01.header.frame_id = ros::this_node::getName();
+    ros_cameraInfoMsg_camera01.header.frame_id = options.frame_image01;
     ros_cameraInfoMsg_camera01.height = 0;
     ros_cameraInfoMsg_camera01.width  = 0;
     //ros_cameraInfoMsg_camera01.D.resize(5);
     //ros_cameraInfoMsg_camera00.distortion_model=sensor_msgs::distortion_models::PLUMB_BOB;
 
     ros_cameraInfoMsg_camera02.header.stamp = ros::Time::now();
-    ros_cameraInfoMsg_camera02.header.frame_id = ros::this_node::getName();
+    ros_cameraInfoMsg_camera02.header.frame_id = options.frame_image02;
     ros_cameraInfoMsg_camera02.height = 0;
     ros_cameraInfoMsg_camera02.width  = 0;
     //ros_cameraInfoMsg_camera02.D.resize(5);
     //ros_cameraInfoMsg_camera02.distortion_model=sensor_msgs::distortion_models::PLUMB_BOB;
 
     ros_cameraInfoMsg_camera03.header.stamp = ros::Time::now();
-    ros_cameraInfoMsg_camera03.header.frame_id = ros::this_node::getName();
+    ros_cameraInfoMsg_camera03.header.frame_id = options.frame_image03;
     ros_cameraInfoMsg_camera03.height = 0;
     ros_cameraInfoMsg_camera03.width  = 0;
     //ros_cameraInfoMsg_camera03.D.resize(5);
@@ -750,7 +765,6 @@ int main(int argc, char **argv)
             }
 
             cv_bridge_img.encoding = sensor_msgs::image_encodings::BGR8;
-            cv_bridge_img.header.frame_id = ros::this_node::getName();
 
             if (!options.timestamps)
             {
@@ -772,6 +786,8 @@ int main(int argc, char **argv)
                 cv_bridge_img.header.stamp = parseTime(str_support).stamp;
                 ros_msg02.header.stamp = ros_cameraInfoMsg_camera02.header.stamp = cv_bridge_img.header.stamp;
             }
+
+            cv_bridge_img.header.frame_id = options.frame_image02;
             cv_bridge_img.image = cv_image02;
             cv_bridge_img.toImageMsg(ros_msg02);
 
@@ -796,6 +812,7 @@ int main(int argc, char **argv)
                 ros_msg03.header.stamp = ros_cameraInfoMsg_camera03.header.stamp = cv_bridge_img.header.stamp;
             }
 
+            cv_bridge_img.header.frame_id = options.frame_image03;
             cv_bridge_img.image = cv_image03;
             cv_bridge_img.toImageMsg(ros_msg03);
 
@@ -829,7 +846,6 @@ int main(int argc, char **argv)
             }
 
             cv_bridge_img.encoding = sensor_msgs::image_encodings::MONO8;
-            cv_bridge_img.header.frame_id = ros::this_node::getName();
 
             if (!options.timestamps)
             {
@@ -851,6 +867,7 @@ int main(int argc, char **argv)
                 cv_bridge_img.header.stamp = parseTime(str_support).stamp;
                 ros_msg00.header.stamp = ros_cameraInfoMsg_camera00.header.stamp = cv_bridge_img.header.stamp;
             }
+            cv_bridge_img.header.frame_id = options.frame_image00;
             cv_bridge_img.image = cv_image00;
             cv_bridge_img.toImageMsg(ros_msg00);
 
@@ -874,6 +891,7 @@ int main(int argc, char **argv)
                 cv_bridge_img.header.stamp = parseTime(str_support).stamp;
                 ros_msg01.header.stamp = ros_cameraInfoMsg_camera01.header.stamp = cv_bridge_img.header.stamp;
             }
+            cv_bridge_img.header.frame_id = options.frame_image01;
             cv_bridge_img.image = cv_image01;
             cv_bridge_img.toImageMsg(ros_msg01);
 
@@ -883,7 +901,8 @@ int main(int argc, char **argv)
         }
 
         if(options.velodyne || options.all_data)
-        {            
+        {
+            header_support.frame_id = options.frame_velodyne;
             header_support.stamp = current_timestamp;
             full_filename_velodyne = dir_velodyne_points + boost::str(boost::format("%010d") % entries_played ) + ".bin";
 
@@ -909,6 +928,7 @@ int main(int argc, char **argv)
 
         if(options.gps || options.all_data)
         {
+            header_support.frame_id = options.frame_oxts;
             header_support.stamp = current_timestamp; //ros::Time::now();
             if (options.timestamps)
             {
@@ -932,14 +952,12 @@ int main(int argc, char **argv)
                 node.shutdown();
                 return 1;
             }
-
-
-
             gps_pub.publish(ros_msgGpsFix);
         }
 
         if(options.imu || options.all_data)
         {
+            header_support.frame_id = options.frame_oxts;
             header_support.stamp = current_timestamp; //ros::Time::now();
             if (options.timestamps)
             {
