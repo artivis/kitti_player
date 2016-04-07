@@ -30,6 +30,7 @@
 #include <boost/progress.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/tokenizer.hpp>
+#include <boost/timer.hpp> 
 #include <cv_bridge/cv_bridge.h>
 #include <fstream>
 #include <image_transport/image_transport.h>
@@ -737,6 +738,7 @@ int main(int argc, char **argv)
 
     do
     {
+        boost::timer t;
         // single timestamp for all published stuff
         Time current_timestamp=ros::Time::now();
 
@@ -988,6 +990,7 @@ int main(int argc, char **argv)
 
         ++progress;
         entries_played++;
+        ROS_DEBUG_STREAM("Loop took "<< t.elapsed() << " [s].");        
         loop_rate.sleep();
     }while(entries_played<=total_entries-1 && ros::ok());
 
@@ -1001,7 +1004,6 @@ int main(int argc, char **argv)
             cv::destroyWindow("CameraSimulator Grayscale Viewer");
         ROS_INFO_STREAM(" Closing CV viewer(s)... OK");
     }
-
 
     ROS_INFO_STREAM("Done!");
     node.shutdown();
