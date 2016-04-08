@@ -587,8 +587,8 @@ int main(int argc, char **argv)
         cout << "    ├── velodyne_points       " << endl;
         cout << "    │   └── data              " << endl;
         cout << "    │     └ timestamps.txt    " << endl;
-        cout << "    ├── calib_cam_to_cam.txt  " << endl << endl;
-        cout << "    ├── calib_imu_to_velo.txt " << endl << endl;
+        cout << "    ├── calib_cam_to_cam.txt  " << endl;
+        cout << "    ├── calib_imu_to_velo.txt " << endl;
         cout << "    └── calib_velo_to_cam.txt " << endl << endl;
 
         ROS_WARN_STREAM("Parse error, shutting down node\n");
@@ -671,8 +671,8 @@ int main(int argc, char **argv)
         cout << "    ├── velodyne_points       " << endl;
         cout << "    │   └── data              " << endl;
         cout << "    │     └ timestamps.txt    " << endl;
-        cout << "    ├── calib_cam_to_cam.txt  " << endl << endl;
-        cout << "    ├── calib_imu_to_velo.txt " << endl << endl;
+        cout << "    ├── calib_cam_to_cam.txt  " << endl;
+        cout << "    ├── calib_imu_to_velo.txt " << endl;
         cout << "    └── calib_velo_to_cam.txt " << endl << endl;
 
         return 1;
