@@ -124,7 +124,7 @@ int publish_velodyne(ros::Publisher &pub, string infile, std_msgs::Header *heade
     }
 }
 
-int getCalibration(string dir_root, string camera_name, double* K,std::vector<double> & D,double *R,double* P){
+int getCamCalibration(string dir_root, string camera_name, double* K,std::vector<double> & D,double *R,double* P){
 /*
  *   from: http://kitti.is.tue.mpg.de/kitti/devkit_raw_data.zip
  *   calib_cam_to_cam.txt: Camera-to-camera calibration
@@ -897,8 +897,8 @@ int main(int argc, char **argv)
     if(options.color || options.all_data)
     {
         if(
-           !(getCalibration(dir_root,"02",ros_cameraInfoMsg_camera02.K.data(),ros_cameraInfoMsg_camera02.D,ros_cameraInfoMsg_camera02.R.data(),ros_cameraInfoMsg_camera02.P.data()) &&
-           getCalibration(dir_root,"03",ros_cameraInfoMsg_camera03.K.data(),ros_cameraInfoMsg_camera03.D,ros_cameraInfoMsg_camera03.R.data(),ros_cameraInfoMsg_camera03.P.data()))
+           !(getCamCalibration(dir_root,"02",ros_cameraInfoMsg_camera02.K.data(),ros_cameraInfoMsg_camera02.D,ros_cameraInfoMsg_camera02.R.data(),ros_cameraInfoMsg_camera02.P.data()) &&
+           getCamCalibration(dir_root,"03",ros_cameraInfoMsg_camera03.K.data(),ros_cameraInfoMsg_camera03.D,ros_cameraInfoMsg_camera03.R.data(),ros_cameraInfoMsg_camera03.P.data()))
           )
         {
             ROS_ERROR_STREAM("Error reading CAMERA02/CAMERA03 calibration");
@@ -916,8 +916,8 @@ int main(int argc, char **argv)
     if(options.grayscale || options.all_data)
     {
         if(
-           !(getCalibration(dir_root,"00",ros_cameraInfoMsg_camera00.K.data(),ros_cameraInfoMsg_camera00.D,ros_cameraInfoMsg_camera00.R.data(),ros_cameraInfoMsg_camera00.P.data()) &&
-           getCalibration(dir_root,"01",ros_cameraInfoMsg_camera01.K.data(),ros_cameraInfoMsg_camera01.D,ros_cameraInfoMsg_camera01.R.data(),ros_cameraInfoMsg_camera01.P.data()))
+           !(getCamCalibration(dir_root,"00",ros_cameraInfoMsg_camera00.K.data(),ros_cameraInfoMsg_camera00.D,ros_cameraInfoMsg_camera00.R.data(),ros_cameraInfoMsg_camera00.P.data()) &&
+           getCamCalibration(dir_root,"01",ros_cameraInfoMsg_camera01.K.data(),ros_cameraInfoMsg_camera01.D,ros_cameraInfoMsg_camera01.R.data(),ros_cameraInfoMsg_camera01.P.data()))
           )
         {
             ROS_ERROR_STREAM("Error reading CAMERA00/CAMERA01 calibration");
