@@ -191,7 +191,7 @@ int main(int argc, char ** argv)
 
     if(calib_file_to_tf_stamped(argv[1],msg))
     {
-      ROS_ERROR("error parsing calib file");
+      ROS_ERROR("error parsing %s", argv[1]);
       return -1;
     }
 
@@ -215,7 +215,7 @@ int main(int argc, char ** argv)
 
     if(cam_calib_file_to_tf_stamped(argv[1],msgs))
     {
-      ROS_ERROR("error parsing calib file");
+      ROS_ERROR("error parsing %s", argv[1]);
       return -1;
     }
 
@@ -252,11 +252,19 @@ int main(int argc, char ** argv)
   else
   {
     printf("A command line utility for manually sending a transform from a kitti calibration file.\n");
-    //printf("It will periodicaly republish the given transform. \n");
     printf("Usage: kitti_static_transform_publisher calib_X_to_Y.txt frame_id_X frame_id_Y \n");
     printf("OR \n");
-    printf("Usage: kitti_static_transform_publisher calib_cam_to_cam.txt frame_id_image_00 frame_id_image_01 frame_id_image_02 frame_id_image_03 \n");
-    printf("\nThis transform is the transform of the coordinate frame child_frame_id into the coordinate frame frame_id.\n");
+    printf("Usage: kitti_static_transform_publisher calib_cam_to_cam.txt frame_id_cam00 frame_id_cam01 frame_id_cam02 frame_id_cam03 \n");
+    printf("\nNote that to better fit the tf tree structure the published transforms\n");
+    printf("are the inverse of the ones in the calibration files, i.e. publishing all\n");
+    printf("three calibration files from the kitti_dataset will produce the following\n");
+    printf("tf tree:\n");
+    printf("  imu                  \n");
+    printf("  └── velo             \n");
+    printf("      └── cam_00       \n");
+    printf("          ├── cam_01   \n");
+    printf("          ├── cam_02   \n");
+    printf("          └── cam_03   \n\n");
     ROS_ERROR("kitti_static_transform_publisher exited due to not having the right number of arguments");
     return -1;
   }
