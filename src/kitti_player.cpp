@@ -55,6 +55,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <kitti_player/terminalhandler.h>
 
 #include <time.h>
 
@@ -80,6 +81,7 @@ struct kitti_player_options
     bool    timestamps;     // use KITTI timestamps;
     bool    statictf;       // publish static transforms on tf
     bool    odomtf;         // publish odometry on tf
+    bool    start_paused;   // start the player paused
     string  frame_oxts;     // frame_id for frame attached to oxts
     string  frame_odom;     // frame_id for frame used to publish odometry messages
     string  frame_velodyne; // frame_id for frame attached to velodyne
@@ -538,6 +540,7 @@ int main(int argc, char **argv)
         ("timestamps,T   ",  po::value<bool> (&options.timestamps)    ->implicit_value(1) ->default_value(0)  ,  "use KITTI timestamps")
         ("statictf       ",  po::value<bool> (&options.statictf)      ->implicit_value(1) ->default_value(0)  ,  "publish static transforms on tf")
         ("odomtf         ",  po::value<bool> (&options.odomtf)        ->implicit_value(1) ->default_value(0)  ,  "publish odometry on tf")
+        ("pause          ",  po::value<bool> (&options.start_paused)  ->implicit_value(1) ->default_value(0)  ,  "start the player paused")
         ("frame_oxts     ",  po::value<string>(&options.frame_oxts)->default_value("oxts")                  ,  "name of frame attached to oxts")
         ("frame_odom     ",  po::value<string>(&options.frame_odom)->default_value("odom")                  ,  "name of frame used to publish odometry messages")
         ("frame_velodyne ",  po::value<string>(&options.frame_velodyne)->default_value("velodyne")          ,  "name of frame attached to velodyne")
@@ -934,10 +937,29 @@ int main(int argc, char **argv)
         ros_cameraInfoMsg_camera01.width  = ros_cameraInfoMsg_camera00.width  = cv_image00.cols;// -1;
     }
 
+    // Object used to handle user inputs on terminal
+    TerminalHandler terminal_handler;
+
     boost::progress_display progress(total_entries) ;
+
+    bool paused = options.start_paused;
 
     do
     {
+        bool charsleftorpaused = true;
+        while (charsleftorpaused && ros::ok())
+        {
+            switch (terminal_handler.readCharFromStdin()){
+            case ' ':
+                paused = !paused;
+                break;
+            case EOF:
+                charsleftorpaused = false;
+            }
+        }
+        if(!ros::ok())  break;
+        if(paused)  continue;
+
         boost::timer t;
         // single timestamp for all published stuff
         Time current_timestamp=ros::Time::now();
