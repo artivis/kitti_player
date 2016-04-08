@@ -79,6 +79,7 @@ struct kitti_player_options
     bool    viewer;         // enable CV viewer
     bool    timestamps;     // use KITTI timestamps;
     bool    statictf;       // publish static transforms on tf
+    bool    odomtf;         // publish odometry on tf
     string  frame_oxts;     // frame_id for frame attached to oxts
     string  frame_odom;     // frame_id for frame used to publish odometry messages
     string  frame_velodyne; // frame_id for frame attached to velodyne
@@ -536,6 +537,7 @@ int main(int argc, char **argv)
         ("viewer         ",  po::value<bool> (&options.viewer)        ->implicit_value(1) ->default_value(0)  ,  "enable image viewer")
         ("timestamps,T   ",  po::value<bool> (&options.timestamps)    ->implicit_value(1) ->default_value(0)  ,  "use KITTI timestamps")
         ("statictf       ",  po::value<bool> (&options.statictf)      ->implicit_value(1) ->default_value(0)  ,  "publish static transforms on tf")
+        ("odomtf         ",  po::value<bool> (&options.odomtf)        ->implicit_value(1) ->default_value(0)  ,  "publish odometry on tf")
         ("frame_oxts     ",  po::value<string>(&options.frame_oxts)->default_value("oxts")                  ,  "name of frame attached to oxts")
         ("frame_odom     ",  po::value<string>(&options.frame_odom)->default_value("odom")                  ,  "name of frame used to publish odometry messages")
         ("frame_velodyne ",  po::value<string>(&options.frame_velodyne)->default_value("velodyne")          ,  "name of frame attached to velodyne")
@@ -1253,7 +1255,7 @@ int main(int argc, char **argv)
 
         }
 
-        if(options.odometry || options.all_data)
+        if(options.odometry || options.odomtf)
         {
             header_support.frame_id = options.frame_odom;
             header_support.stamp = current_timestamp; //ros::Time::now();
@@ -1280,10 +1282,17 @@ int main(int argc, char **argv)
                 return 1;
             }
 
-            ros_msgOdom.child_frame_id = options.frame_oxts;
-            odom_pub.publish(ros_msgOdom);
-            ros_msgTf.child_frame_id = options.frame_oxts;
-            tf_br.sendTransform(ros_msgTf);
+            if(options.odometry)
+            {
+                ros_msgOdom.child_frame_id = options.frame_oxts;
+                odom_pub.publish(ros_msgOdom);
+            }
+
+            if(options.odomtf)
+            {
+                ros_msgTf.child_frame_id = options.frame_oxts;
+                tf_br.sendTransform(ros_msgTf);
+            }
         }
 
         ++progress;
