@@ -46,6 +46,7 @@ void TerminalHandler::setupTerminal() {
     tcgetattr(fd, &orig_flags_);
     flags = orig_flags_;
     flags.c_lflag &= ~ICANON;      // set raw (unset canonical modes)
+    flags.c_lflag &= ~ECHO;        // disable echo
     flags.c_cc[VMIN]  = 0;         // i.e. min 1 char for blocking, 0 chars for non-blocking
     flags.c_cc[VTIME] = 0;         // block if waiting for char
     tcsetattr(fd, TCSANOW, &flags);
