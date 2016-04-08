@@ -49,9 +49,13 @@
 #include <geodesy/utm.h>
 #include <sstream>
 #include <string>
-#include <tf/LinearMath/Transform.h>
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/static_transform_broadcaster.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
 #include <time.h>
 
 using namespace std;
@@ -74,6 +78,7 @@ struct kitti_player_options
     bool    color;          // publish
     bool    viewer;         // enable CV viewer
     bool    timestamps;     // use KITTI timestamps;
+    bool    statictf;       // publish static transforms on tf
     string  frame_oxts;     // frame_id for frame attached to oxts
     string  frame_odom;     // frame_id for frame used to publish odometry messages
     string  frame_velodyne; // frame_id for frame attached to velodyne
@@ -215,6 +220,106 @@ int getCalibration(string dir_root, string camera_name, double* K,std::vector<do
     return true;
 }
 
+// If camera_name is informed, we look for T_XX and R_XX tokens
+int getStaticTransform(string calib_filename, geometry_msgs::TransformStamped *ros_msgTf, std_msgs::Header *header, string camera_name = "")
+{
+    ifstream calib_file(calib_filename.c_str());
+    if (!calib_file.is_open())
+        return false;
+
+    // if(camera_name.empty())
+    //     ROS_INFO_STREAM("Reading transformation from " << calib_filename);
+    // else
+    //     ROS_INFO_STREAM("Reading transformation for camera " << camera_name << " from " << calib_filename);
+
+    ROS_DEBUG_STREAM("Reading transformation" << (camera_name.empty()? string(""): string("for camera")+camera_name) << " from " << calib_filename);
+
+    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
+    boost::char_separator<char> sep{" "};
+
+    string line="";
+    char index=0;
+    tokenizer::iterator token_iterator;
+
+    tf2::Transform t;
+
+    while (getline(calib_file,line))
+    {
+        // Parse string phase 1, tokenize it using Boost.
+        tokenizer tok(line,sep);
+
+        // Move the iterator at the beginning of the tokenize vector and check for T/R matrices.
+        token_iterator=tok.begin();
+        if (strcmp((*token_iterator).c_str(),((string)(string("T")+(camera_name.empty()?string(""):string("_")+camera_name)+string(":"))).c_str())==0) //Calibration Matrix
+        {
+            index=0; //should be 3 at the end
+            ROS_DEBUG_STREAM("T" << (camera_name.empty()?string(""):string("_")+camera_name));
+            double T[3];
+            for (token_iterator++; token_iterator != tok.end(); token_iterator++)
+            {
+                // std::cout << *token_iterator << '\n';
+                T[index++]=boost::lexical_cast<double>(*token_iterator);
+            }
+            t.setOrigin(tf2::Vector3(T[0],T[1],T[2]));
+        }
+
+        // EXPERIMENTAL: use with unrectified images
+
+        //        token_iterator=tok.begin();
+        //        if (strcmp((*token_iterator).c_str(),((string)(string("D_")+camera_name+string(":"))).c_str())==0) //Distortion Coefficients
+        //        {
+        //            index=0; //should be 5 at the end
+        //            ROS_DEBUG_STREAM("D_" << camera_name);
+        //            for (token_iterator++; token_iterator != tok.end(); token_iterator++)
+        //            {
+        ////                std::cout << *token_iterator << '\n';
+        //                D[index++]=boost::lexical_cast<double>(*token_iterator);
+        //            }
+        //        }
+
+        token_iterator=tok.begin();
+        if (strcmp((*token_iterator).c_str(),((string)(string("R")+(camera_name.empty()?string(""):string("_")+camera_name)+string(":"))).c_str())==0) //Rectification Matrix
+        {
+            index=0; //should be 9 at the end
+            ROS_DEBUG_STREAM("R" << (camera_name.empty()?string(""):string("_")+camera_name));
+            double R[9];
+            for (token_iterator++; token_iterator != tok.end(); token_iterator++)
+            {
+                // std::cout << *token_iterator << '\n';
+                R[index++]=boost::lexical_cast<double>(*token_iterator);
+            }
+            tf2::Matrix3x3 mat(R[0],R[1],R[2],
+                              R[3],R[4],R[5],
+                              R[6],R[7],R[8]);
+            tf2::Quaternion quat;  mat.getRotation(quat);
+            t.setRotation(quat);
+        }
+
+        // token_iterator=tok.begin();
+        // if (strcmp((*token_iterator).c_str(),((string)(string("P_rect_")+camera_name+string(":"))).c_str())==0) //Projection Matrix Rectified
+        // {
+        //     index=0; //should be 12 at the end
+        //     ROS_DEBUG_STREAM("P_rect_" << camera_name);
+        //     for (token_iterator++; token_iterator != tok.end(); token_iterator++)
+        //     {
+        //         //std::cout << *token_iterator << '\n';
+        //         P[index++]=boost::lexical_cast<double>(*token_iterator);
+        //     }
+        // }
+
+    }
+
+    // fill up tf message
+    ros_msgTf->header.frame_id = header->frame_id;
+    ros_msgTf->header.stamp = header->stamp;
+
+    // Invert transform to match the tf tree structure: oxts -> velodyne -> cam00 -> cam{01,02,03}
+    tf2::convert(t.inverse(),ros_msgTf->transform);
+
+    ROS_DEBUG_STREAM("... ok");
+    return true;
+}
+
 int getGPS(string filename, sensor_msgs::NavSatFix *ros_msgGpsFix, std_msgs::Header *header)
 {
     ifstream file_oxts(filename.c_str());
@@ -295,10 +400,10 @@ int getIMU(string filename, sensor_msgs::Imu *ros_msgImu, std_msgs::Header *head
     //    - roll:    roll angle (rad),  0 = level, positive = left side up (-pi..pi)
     //    - pitch:   pitch angle (rad), 0 = level, positive = front down (-pi/2..pi/2)
     //    - yaw:     heading (rad),     0 = east,  positive = counter clockwise (-pi..pi)
-    tf::Quaternion q=tf::createQuaternionFromRPY(   boost::lexical_cast<double>(s[3]),
-                                                    boost::lexical_cast<double>(s[4]),
-                                                    boost::lexical_cast<double>(s[5])
-                                                    );
+    tf2::Quaternion q; q.setRPY( boost::lexical_cast<double>(s[3]),
+                                 boost::lexical_cast<double>(s[4]),
+                                 boost::lexical_cast<double>(s[5])
+                                 );
     ros_msgImu->orientation.x = q.getX();
     ros_msgImu->orientation.y = q.getY();
     ros_msgImu->orientation.z = q.getZ();
@@ -307,9 +412,9 @@ int getIMU(string filename, sensor_msgs::Imu *ros_msgImu, std_msgs::Header *head
     return 1;
 }
 
-int getOdomTf(string filename, nav_msgs::Odometry *ros_msgOdom, tf::Transform *t, std_msgs::Header *header)
+int getOdomTf(string filename, nav_msgs::Odometry *ros_msgOdom, geometry_msgs::TransformStamped *ros_msgTf, std_msgs::Header *header)
 {
-    static tf::Transform origin;
+    static tf2::Transform origin;
     static bool first = true;
 
     ifstream file_oxts(filename.c_str());
@@ -333,10 +438,10 @@ int getOdomTf(string filename, nav_msgs::Odometry *ros_msgOdom, tf::Transform *t
     //    - roll:    roll angle (rad),  0 = level, positive = left side up (-pi..pi)
     //    - pitch:   pitch angle (rad), 0 = level, positive = front down (-pi/2..pi/2)
     //    - yaw:     heading (rad),     0 = east,  positive = counter clockwise (-pi..pi)
-    tf::Quaternion q=tf::createQuaternionFromRPY(   boost::lexical_cast<double>(s[3]),
-                                                    boost::lexical_cast<double>(s[4]),
-                                                    boost::lexical_cast<double>(s[5])
-                                                    );
+    tf2::Quaternion q; q.setRPY(   boost::lexical_cast<double>(s[3]),
+                                   boost::lexical_cast<double>(s[4]),
+                                   boost::lexical_cast<double>(s[5])
+                                   );
     //    - lat:     latitude of the oxts-unit (deg)
     //    - lon:     longitude of the oxts-unit (deg)
     //    - alt:     altitude of the oxts-unit (m)
@@ -346,32 +451,37 @@ int getOdomTf(string filename, nav_msgs::Odometry *ros_msgOdom, tf::Transform *t
                                              ));
 
     // set a transform from utm and orientation
-    t->setOrigin(tf::Vector3(utmP.easting, utmP.northing, utmP.altitude));
-    t->setRotation(q);
+    tf2::Transform t(q, tf2::Vector3(utmP.easting, utmP.northing, utmP.altitude));
 
     // Initialize origin
     if(first)
     {
-        origin = *t;
+        origin = t;
         first = false;
     }
 
     // Put transform in origin frame
     // *t *= origin.inverse();
-    *t = origin.inverse() * (*t);
+    t = origin.inverse() * t;
 
     // fill up the odometry msg
     ros_msgOdom->header.frame_id = header->frame_id;
     ros_msgOdom->header.stamp = header->stamp;
 
-    ros_msgOdom->pose.pose.position.x = t->getOrigin().getX();
-    ros_msgOdom->pose.pose.position.y = t->getOrigin().getY();
-    ros_msgOdom->pose.pose.position.z = t->getOrigin().getZ();
+    ros_msgOdom->pose.pose.position.x = t.getOrigin().getX();
+    ros_msgOdom->pose.pose.position.y = t.getOrigin().getY();
+    ros_msgOdom->pose.pose.position.z = t.getOrigin().getZ();
 
-    ros_msgOdom->pose.pose.orientation.x = t->getRotation().getX();
-    ros_msgOdom->pose.pose.orientation.y = t->getRotation().getY();
-    ros_msgOdom->pose.pose.orientation.z = t->getRotation().getZ();
-    ros_msgOdom->pose.pose.orientation.w = t->getRotation().getW();
+    ros_msgOdom->pose.pose.orientation.x = t.getRotation().getX();
+    ros_msgOdom->pose.pose.orientation.y = t.getRotation().getY();
+    ros_msgOdom->pose.pose.orientation.z = t.getRotation().getZ();
+    ros_msgOdom->pose.pose.orientation.w = t.getRotation().getW();
+
+    // fill up tf msg
+    ros_msgTf->header.frame_id = header->frame_id;
+    ros_msgTf->header.stamp = header->stamp;
+
+    tf2::convert(t,ros_msgTf->transform);
 
     return 1;
 }
@@ -425,6 +535,7 @@ int main(int argc, char **argv)
         ("color     ,C   ",  po::value<bool> (&options.color)         ->implicit_value(1) ->default_value(0)  ,  "replay Stereo Color images")
         ("viewer         ",  po::value<bool> (&options.viewer)        ->implicit_value(1) ->default_value(0)  ,  "enable image viewer")
         ("timestamps,T   ",  po::value<bool> (&options.timestamps)    ->implicit_value(1) ->default_value(0)  ,  "use KITTI timestamps")
+        ("statictf       ",  po::value<bool> (&options.statictf)      ->implicit_value(1) ->default_value(0)  ,  "publish static transforms on tf")
         ("frame_oxts     ",  po::value<string>(&options.frame_oxts)->default_value("oxts")                  ,  "name of frame attached to oxts")
         ("frame_odom     ",  po::value<string>(&options.frame_odom)->default_value("odom")                  ,  "name of frame used to publish odometry messages")
         ("frame_velodyne ",  po::value<string>(&options.frame_velodyne)->default_value("velodyne")          ,  "name of frame attached to velodyne")
@@ -474,7 +585,9 @@ int main(int argc, char **argv)
         cout << "    ├── velodyne_points       " << endl;
         cout << "    │   └── data              " << endl;
         cout << "    │     └ timestamps.txt    " << endl;
-        cout << "    └── calib_cam_to_cam.txt  " << endl << endl;
+        cout << "    ├── calib_cam_to_cam.txt  " << endl << endl;
+        cout << "    ├── calib_imu_to_velo.txt " << endl << endl;
+        cout << "    └── calib_velo_to_cam.txt " << endl << endl;
 
         ROS_WARN_STREAM("Parse error, shutting down node\n");
         return 1;
@@ -525,12 +638,13 @@ int main(int argc, char **argv)
     ros::Publisher gps_pub = node.advertise<sensor_msgs::NavSatFix>  ("oxts/gps", 1, true);
     ros::Publisher imu_pub = node.advertise<sensor_msgs::Imu>  ("oxts/imu", 1, true);
     ros::Publisher odom_pub = node.advertise<nav_msgs::Odometry>  ("odometry", 1, true);
-    tf::TransformBroadcaster tf_br;
+    tf2_ros::TransformBroadcaster tf_br;
+    tf2_ros::StaticTransformBroadcaster static_tf_br;
 
     sensor_msgs::NavSatFix ros_msgGpsFix;
     sensor_msgs::Imu ros_msgImu;
     nav_msgs::Odometry ros_msgOdom;
-    tf::Transform ros_tfOdom;
+    geometry_msgs::TransformStamped ros_msgTf;
 
     if (vm.count("help")) {
         cout << desc << endl;
@@ -555,7 +669,9 @@ int main(int argc, char **argv)
         cout << "    ├── velodyne_points       " << endl;
         cout << "    │   └── data              " << endl;
         cout << "    │     └ timestamps.txt    " << endl;
-        cout << "    └── calib_cam_to_cam.txt  " << endl << endl;
+        cout << "    ├── calib_cam_to_cam.txt  " << endl << endl;
+        cout << "    ├── calib_imu_to_velo.txt " << endl << endl;
+        cout << "    └── calib_velo_to_cam.txt " << endl << endl;
 
         return 1;
     }
@@ -824,6 +940,73 @@ int main(int argc, char **argv)
         // single timestamp for all published stuff
         Time current_timestamp=ros::Time::now();
 
+        // Do it once if enabled
+        if(options.statictf)
+        {
+            options.statictf = false;
+
+            // velodyne
+            header_support.frame_id = options.frame_oxts;
+            header_support.stamp = current_timestamp;
+            if(!getStaticTransform(dir_root+"calib_imu_to_velo.txt", &ros_msgTf, &header_support))
+            {
+                ROS_ERROR_STREAM("Error reading IMU/VELODYNE calibration");
+                node.shutdown();
+                return 1;
+            }
+            ros_msgTf.child_frame_id = options.frame_velodyne;
+            static_tf_br.sendTransform(ros_msgTf);
+
+            // image00
+            header_support.frame_id = options.frame_velodyne;
+            header_support.stamp = current_timestamp;
+            if(!getStaticTransform(dir_root+"calib_velo_to_cam.txt", &ros_msgTf, &header_support))
+            {
+                ROS_ERROR_STREAM("Error reading VELODYNE/CAMERA00 calibration");
+                node.shutdown();
+                return 1;
+            }
+            ros_msgTf.child_frame_id = options.frame_image00;
+            static_tf_br.sendTransform(ros_msgTf);
+
+            // image01
+            header_support.frame_id = options.frame_image00;
+            header_support.stamp = current_timestamp;
+            if(!getStaticTransform(dir_root+"calib_cam_to_cam.txt", &ros_msgTf, &header_support, "01"))
+            {
+                ROS_ERROR_STREAM("Error reading CAMERA00/CAMERA01 calibration");
+                node.shutdown();
+                return 1;
+            }
+            ros_msgTf.child_frame_id = options.frame_image01;
+            static_tf_br.sendTransform(ros_msgTf);
+
+            // image02
+            header_support.frame_id = options.frame_image00;
+            header_support.stamp = current_timestamp;
+            if(!getStaticTransform(dir_root+"calib_cam_to_cam.txt", &ros_msgTf, &header_support, "02"))
+            {
+                ROS_ERROR_STREAM("Error reading CAMERA00/CAMERA02 calibration");
+                node.shutdown();
+                return 1;
+            }
+            ros_msgTf.child_frame_id = options.frame_image02;
+            static_tf_br.sendTransform(ros_msgTf);
+
+            // image03
+            header_support.frame_id = options.frame_image00;
+            header_support.stamp = current_timestamp;
+            if(!getStaticTransform(dir_root+"calib_cam_to_cam.txt", &ros_msgTf, &header_support, "03"))
+            {
+                ROS_ERROR_STREAM("Error reading CAMERA00/CAMERA02 calibration");
+                node.shutdown();
+                return 1;
+            }
+            ros_msgTf.child_frame_id = options.frame_image03;
+            static_tf_br.sendTransform(ros_msgTf);
+        }
+
+
         if(options.color || options.all_data)
         {
             full_filename_image02 = dir_image02 + boost::str(boost::format("%010d") % entries_played ) + ".png";
@@ -1090,7 +1273,7 @@ int main(int argc, char **argv)
             }
 
             full_filename_oxts = dir_oxts + boost::str(boost::format("%010d") % entries_played ) + ".txt";
-            if (!getOdomTf(full_filename_oxts,&ros_msgOdom,&ros_tfOdom,&header_support))
+            if (!getOdomTf(full_filename_oxts,&ros_msgOdom,&ros_msgTf,&header_support))
             {
                 ROS_ERROR_STREAM("Fail to open " << full_filename_oxts);
                 node.shutdown();
@@ -1099,11 +1282,8 @@ int main(int argc, char **argv)
 
             ros_msgOdom.child_frame_id = options.frame_oxts;
             odom_pub.publish(ros_msgOdom);
-            tf_br.sendTransform(tf::StampedTransform(   ros_tfOdom, 
-                                                        ros_msgOdom.header.stamp,
-                                                        ros_msgOdom.header.frame_id,
-                                                        ros_msgOdom.child_frame_id
-                                                        ));
+            ros_msgTf.child_frame_id = options.frame_oxts;
+            tf_br.sendTransform(ros_msgTf);
         }
 
         ++progress;
