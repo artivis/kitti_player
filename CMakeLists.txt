@@ -33,10 +33,11 @@ include_directories(
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-add_library(kitti src/terminalhandler.cpp)
+add_library(kitti src/Player.cpp src/PlayerSupport.cpp)
+target_link_libraries(kitti ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(kitti_player src/kitti_player.cpp)
-target_link_libraries(kitti_player kitti ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(kitti_player kitti)
 
 add_executable(kitti_static_transform_broadcaster src/kitti_static_transform_broadcaster.cpp)
 target_link_libraries(kitti_static_transform_broadcaster ${catkin_LIBRARIES})
