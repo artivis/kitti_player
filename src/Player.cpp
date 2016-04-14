@@ -248,11 +248,11 @@ int Player::checkAllDirectories()
             ||
             (options_.velodyne   && (   (!fs::exists(fs::path(dir_velodyne_points_)) || !fs::is_directory(fs::path(dir_velodyne_points_)))))
             ||
-            (options_.timestamps && (   (!fs::exists(fs::path(dir_timestamp_image00_))         || !fs::is_directory(fs::path(dir_timestamp_image00_))) ||
-                                        (!fs::exists(fs::path(dir_timestamp_image01_))         || !fs::is_directory(fs::path(dir_timestamp_image01_))) ||
-                                        (!fs::exists(fs::path(dir_timestamp_image02_))         || !fs::is_directory(fs::path(dir_timestamp_image02_))) ||
-                                        (!fs::exists(fs::path(dir_timestamp_image03_))         || !fs::is_directory(fs::path(dir_timestamp_image03_))) ||
-                                        (!fs::exists(fs::path(dir_timestamp_oxts_))            || !fs::is_directory(fs::path(dir_timestamp_oxts_)))    ||
+            (options_.timestamps && (   (!fs::exists(fs::path(dir_timestamp_image00_))  || !fs::is_directory(fs::path(dir_timestamp_image00_))) ||
+                                        (!fs::exists(fs::path(dir_timestamp_image01_))  || !fs::is_directory(fs::path(dir_timestamp_image01_))) ||
+                                        (!fs::exists(fs::path(dir_timestamp_image02_))  || !fs::is_directory(fs::path(dir_timestamp_image02_))) ||
+                                        (!fs::exists(fs::path(dir_timestamp_image03_))  || !fs::is_directory(fs::path(dir_timestamp_image03_))) ||
+                                        (!fs::exists(fs::path(dir_timestamp_oxts_))     || !fs::is_directory(fs::path(dir_timestamp_oxts_)))    ||
                                         (!fs::exists(fs::path(dir_timestamp_velodyne_)) || !fs::is_directory(fs::path(dir_timestamp_velodyne_)))
                                     )
             )
