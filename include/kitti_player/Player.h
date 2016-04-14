@@ -12,6 +12,10 @@
 #include <cv_bridge/cv_bridge.h>
 
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/NavSatFix.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <nav_msgs/Odometry.h>
 
 #include <rosgraph_msgs/Clock.h>
 
@@ -75,17 +79,16 @@ private:
   int readCharFromStdin();
   void restoreTerminal();
   void setupTerminal();
-  void publishStaticTf();
+  void loadStaticTfs();
   ros::Time getTimestampAt(unsigned int entry);
   void clockThread();
   void tfThread();
-  void publishColorDataAt(unsigned int entry);
-  void publishGrayscaleDataAt(unsigned int entry);
-  void publishVelodyneDataAt(unsigned int entry);
-  void publishGpsDataAt(unsigned int entry);
-  void publishImuDataAt(unsigned int entry);
-  void publishOdometryDataAt(unsigned int entry);
-  void updateOdomTfToDataAt(unsigned int entry);
+  void loadColorDataAt(unsigned int entry);
+  void loadGrayscaleDataAt(unsigned int entry);
+  void loadVelodyneDataAt(unsigned int entry);
+  void loadGpsDataAt(unsigned int entry);
+  void loadImuDataAt(unsigned int entry);
+  void loadOdometryDataAt(unsigned int entry);
   tf2::Transform getOdomTfAt(unsigned int entry);
 
 private:
@@ -116,13 +119,15 @@ private:
   ros::Publisher imu_pub_;
   ros::Publisher odom_pub_;
 
-  boost::thread                   tf_thread_;
-  boost::mutex                    tf_lock_;
-  tf2_ros::TransformBroadcaster   tf_br_;
-  geometry_msgs::TransformStamped tf_msg_;
+  boost::thread                 tf_thread_;
+  boost::mutex                  tf_lock_;
+  tf2_ros::TransformBroadcaster tf_br_;
+  tf2_msgs::TFMessage           tf_msg_;
   bool has_tf_msg_;
 
   tf2_ros::StaticTransformBroadcaster static_tf_br_;
+  tf2_msgs::TFMessage static_tf_msg_;
+  bool static_tf_published_;
 
   cv::Mat cv_image00_;
   cv::Mat cv_image01_;
@@ -138,6 +143,11 @@ private:
   sensor_msgs::CameraInfo ros_cameraInfoMsg_camera01_;
   sensor_msgs::CameraInfo ros_cameraInfoMsg_camera02_;
   sensor_msgs::CameraInfo ros_cameraInfoMsg_camera03_;
+
+  nav_msgs::Odometry odom_msg_;
+  sensor_msgs::Imu imu_msg_;
+  sensor_msgs::NavSatFix gps_msg_;
+  sensor_msgs::PointCloud2 points_msg_;
 
   cv_bridge::CvImage cv_bridge_img_;
 
