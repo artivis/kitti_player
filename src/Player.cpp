@@ -58,6 +58,8 @@ Player::Player(ros::NodeHandle& n, ros::NodeHandle& pn, PlayerOptions options)
  : n_(n),
    pn_(pn),
    options_(options),
+   has_tf_msg_(false),
+   has_clock_msg_(false),
    step_(false),
    quit_(false),
    has_odom_origin_(false),
@@ -322,10 +324,10 @@ void Player::run()
     ros::WallRate loop_rate(options_.frequency);
 
     if(options_.clock)
-        setupClockPublisher();
+        clock_thread_ = boost::thread( &Player::clockThread, this );
 
     if(options_.odomtf)
-        setupTfPublisher();
+        tf_thread_ = boost::thread( &Player::tfThread, this );
 
     if(options_.statictf)
         publishStaticTf();
@@ -353,6 +355,7 @@ void Player::run()
             clock_lock_.lock();
             clock_msg_.clock = current_timestamp_;
             clock_lock_.unlock();
+            if(!has_clock_msg_) has_clock_msg_ = true;
         }
 
         if(options_.color || options_.all_data)
@@ -422,6 +425,8 @@ void Player::updateOdomTfToDataAt(unsigned int entry)
     tf_msg_.child_frame_id = options_.frame_oxts;
     tf2::convert(t,tf_msg_.transform);
     tf_lock_.unlock();
+
+    if(!has_tf_msg_) has_tf_msg_ = true;
 }
 
 tf2::Transform Player::getOdomTfAt(unsigned int entry)
@@ -445,20 +450,6 @@ tf2::Transform Player::getOdomTfAt(unsigned int entry)
     return t;
 }
 
-void Player::setupTfPublisher()
-{
-    // Setup first tf stamp and frames
-    tf_msg_.header.stamp = getTimestampAt(entries_played_);
-    tf_msg_.header.frame_id = options_.frame_odom;
-    tf_msg_.child_frame_id = options_.frame_oxts;
-
-    // get first transform
-    tf2::convert(getOdomTfAt(entries_played_),tf_msg_.transform);
-
-    // Launch thread
-    tf_thread_ = boost::thread( &Player::tfThread, this );
-}
-
 void Player::tfThread()
 {
     // Setup publishing rate
@@ -467,9 +458,12 @@ void Player::tfThread()
     ROS_DEBUG_STREAM("Starting tf publish thread.");
     while(ros::ok() && !quit_)
     {
-        tf_lock_.lock();
-        tf_br_.sendTransform(tf_msg_);
-        tf_lock_.unlock();
+        if(has_tf_msg_)
+        {
+            tf_lock_.lock();
+            tf_br_.sendTransform(tf_msg_);
+            tf_lock_.unlock();
+        }
         tf_rate.sleep();
     }
     ROS_DEBUG_STREAM("Finishing tf publish thread.");
@@ -683,15 +677,6 @@ ros::Time Player::getTimestampAt(unsigned int entry)
     return stamp;
 }
 
-void Player::setupClockPublisher()
-{
-    // Look for first timestamp
-    clock_msg_.clock = getTimestampAt(entries_played_);
-
-    // Launch thread
-    clock_thread_ = boost::thread( &Player::clockThread, this );
-}
-
 void Player::clockThread()
 {
     // Setup publishing rate
@@ -700,10 +685,12 @@ void Player::clockThread()
     ROS_DEBUG_STREAM("Starting clock publish thread.");
     while(ros::ok() && !quit_)
     {
-        clock_lock_.lock();
-        clock_pub_.publish(clock_msg_);
-        clock_lock_.unlock();
-        // FIXME Maybe we should use some "wall" version of Rate here?
+        if(has_clock_msg_)
+        {
+            clock_lock_.lock();
+            clock_pub_.publish(clock_msg_);
+            clock_lock_.unlock();
+        }
         clock_rate.sleep();
     }
     ROS_DEBUG_STREAM("Finishing clock publish thread.");

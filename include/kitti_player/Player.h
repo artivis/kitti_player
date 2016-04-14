@@ -76,9 +76,9 @@ private:
   void restoreTerminal();
   void setupTerminal();
   void publishStaticTf();
-  void setupClockPublisher();
   ros::Time getTimestampAt(unsigned int entry);
   void clockThread();
+  void tfThread();
   void publishColorDataAt(unsigned int entry);
   void publishGrayscaleDataAt(unsigned int entry);
   void publishVelodyneDataAt(unsigned int entry);
@@ -86,8 +86,6 @@ private:
   void publishImuDataAt(unsigned int entry);
   void publishOdometryDataAt(unsigned int entry);
   void updateOdomTfToDataAt(unsigned int entry);
-  void setupTfPublisher();
-  void tfThread();
   tf2::Transform getOdomTfAt(unsigned int entry);
 
 private:
@@ -122,6 +120,7 @@ private:
   boost::mutex                    tf_lock_;
   tf2_ros::TransformBroadcaster   tf_br_;
   geometry_msgs::TransformStamped tf_msg_;
+  bool has_tf_msg_;
 
   tf2_ros::StaticTransformBroadcaster static_tf_br_;
 
@@ -146,6 +145,7 @@ private:
   boost::mutex         clock_lock_;
   ros::Publisher       clock_pub_;
   rosgraph_msgs::Clock clock_msg_;
+  bool has_clock_msg_;
 
 
   typedef pcl::PointCloud<pcl::PointXYZI> PointCloud;
