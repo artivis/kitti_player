@@ -119,12 +119,7 @@ int getStaticTransform(string calib_filename, geometry_msgs::TransformStamped *r
     if (!calib_file.is_open())
         return false;
 
-    // if(camera_name.empty())
-    //     ROS_INFO_STREAM("Reading transformation from " << calib_filename);
-    // else
-    //     ROS_INFO_STREAM("Reading transformation for camera " << camera_name << " from " << calib_filename);
-
-    ROS_INFO_STREAM("Reading transformation" << (camera_name.empty()? string(""): string("for camera")+camera_name) << " from " << calib_filename);
+    ROS_DEBUG_STREAM("Reading transformation" << (camera_name.empty()? string(""): string(" for camera ")+camera_name) << " from " << calib_filename);
 
     typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
     boost::char_separator<char> sep{" "};
@@ -208,7 +203,7 @@ int getStaticTransform(string calib_filename, geometry_msgs::TransformStamped *r
     // Invert transform to match the tf tree structure: oxts -> velodyne -> cam00 -> cam{01,02,03}
     tf2::convert(t.inverse(),ros_msgTf->transform);
 
-    ROS_INFO_STREAM("... ok");
+    ROS_DEBUG_STREAM("... ok");
     return true;
 }
 
