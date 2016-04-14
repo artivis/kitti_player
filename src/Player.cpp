@@ -344,7 +344,7 @@ void Player::run()
         // variable used to display time spent on the loop
         boost::timer t;
 
-        if(options_.timestamps)
+        if(options_.timestamps || options_.clock)
             current_timestamp_ = getTimestampAt(entries_played_);
         else
             current_timestamp_ = ros::Time::now();
