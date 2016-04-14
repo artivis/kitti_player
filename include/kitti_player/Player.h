@@ -59,6 +59,7 @@ struct PlayerOptions
     std::string  frame_image01;  // frame_id for frame attached to camera 01
     std::string  frame_image02;  // frame_id for frame attached to camera 02
     std::string  frame_image03;  // frame_id for frame attached to camera 03
+    std::string  bagpath;        // path to write the ros bag
 
     void printRequiredDirectoryTree();
 };
@@ -69,7 +70,8 @@ public:
 	Player(ros::NodeHandle& n, ros::NodeHandle& pn, PlayerOptions options);
 	~Player();
 	
-  void run();
+  void publish();
+  void writeBag();
 
 private:
   int checkAllDirectories();

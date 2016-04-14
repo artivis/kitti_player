@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <iostream>
 
+#include <rosbag/bag.h>
+
 using namespace std;
 
 namespace fs = boost::filesystem;
@@ -314,8 +316,85 @@ unsigned int Player::countNumEntries()
     ROS_ERROR("An error occured when counting number of entries.");
     return 0;
 }
+
+void Player::writeBag()
+{
+    rosbag::Bag bag;
+    bag.open(options_.bagpath, rosbag::bagmode::Write);
+
+    setupTerminal();
+    boost::progress_display progress(total_entries_) ;
+    while(entries_played_<total_entries_ && !quit_ && ros::ok())
+    {
+        processUserInput();
+
+        if(!ros::ok() || quit_)  break;
+
+        current_timestamp_ = getTimestampAt(entries_played_);
+
+        // do it once
+        if(options_.statictf && !static_tf_published_)
+        {
+            loadStaticTfs();
+            bag.write("tf_static", current_timestamp_, static_tf_msg_);
+            static_tf_published_ = true;
+        }
+
+        if(options_.color || options_.all_data)
+        {
+            loadColorDataAt(entries_played_);
+            bag.write(ros::names::resolve("~color/left/image_rect"), current_timestamp_, ros_msg02_);
+            bag.write(ros::names::resolve("~color/left/camera_info"), current_timestamp_, ros_cameraInfoMsg_camera02_);
+            bag.write(ros::names::resolve("~color/right/image_rect"), current_timestamp_, ros_msg03_);
+            bag.write(ros::names::resolve("~color/right/camera_info"), current_timestamp_, ros_cameraInfoMsg_camera03_);
+        }
+
+        if(options_.grayscale || options_.all_data)
+        {
+            loadGrayscaleDataAt(entries_played_);
+            bag.write(ros::names::resolve("~grayscale/left/image_rect"), current_timestamp_, ros_msg00_);
+            bag.write(ros::names::resolve("~grayscale/left/camera_info"), current_timestamp_, ros_cameraInfoMsg_camera00_);
+            bag.write(ros::names::resolve("~grayscale/right/image_rect"), current_timestamp_, ros_msg01_);
+            bag.write(ros::names::resolve("~grayscale/right/camera_info"), current_timestamp_, ros_cameraInfoMsg_camera01_);
+        }
+
+        if(options_.velodyne || options_.all_data)
+        {
+            loadVelodyneDataAt(entries_played_);
+            bag.write(ros::names::resolve("~hdl64e"), current_timestamp_, points_msg_);
+        }
+
+        if(options_.gps || options_.all_data)
+        {
+            loadGpsDataAt(entries_played_);
+            bag.write(ros::names::resolve("~oxts/gps"), current_timestamp_, gps_msg_);
+        }
+        
+        if(options_.imu || options_.all_data)
+        {
+            loadImuDataAt(entries_played_);
+            bag.write(ros::names::resolve("~oxts/imu"), current_timestamp_, imu_msg_);
+        }
+
+        if(options_.odometry || options_.odomtf)
+        {
+            loadOdometryDataAt(entries_played_);
+            if(options_.odometry)
+                bag.write(ros::names::resolve("~odometry"), current_timestamp_, odom_msg_);
+            if(options_.odomtf)
+                bag.write("tf", current_timestamp_, tf_msg_);
+        }
+
+        ++progress;
+        entries_played_++;
+    }
+
+    bag.close();
+    restoreTerminal();
+    quit_ = true;
+}
     
-void Player::run()
+void Player::publish()
 {
     paused_ = options_.start_paused;
     ros::WallRate loop_rate(options_.frequency);

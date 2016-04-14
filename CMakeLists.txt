@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
                     cv_bridge
                     image_transport
                     geodesy
+                    rosbag
 )
 
 find_package(PCL 1.7 REQUIRED)

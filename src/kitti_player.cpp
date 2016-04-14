@@ -38,6 +38,7 @@ int main(int argc, char **argv)
         ("frame_image01  ",  po::value<string>(&options.frame_image01)->default_value("image01")            ,  "name of frame attached to camera 01")
         ("frame_image02  ",  po::value<string>(&options.frame_image02)->default_value("image02")            ,  "name of frame attached to camera 02")
         ("frame_image03  ",  po::value<string>(&options.frame_image03)->default_value("image03")            ,  "name of frame attached to camera 03")
+        ("bag       ,b   ",  po::value<string>(&options.bagpath)->default_value("")                           ,  "if informed th player will write the dataset as a rosbag on the informed path")
     ;
 
     try // parse options
@@ -81,7 +82,11 @@ int main(int argc, char **argv)
 	ros::NodeHandle pn("~");
 
 	Player player(n, pn, options);
-	player.run();
+
+    if (!options.bagpath.empty())
+        player.writeBag();
+    else
+        player.publish();
 
 	return 0;
 }
