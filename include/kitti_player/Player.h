@@ -89,14 +89,6 @@ private:
   void setupTfPublisher();
   void tfThread();
   tf2::Transform getOdomTfAt(unsigned int entry);
-//   int publish_velodyne(ros::Publisher &pub, string infile, std_msgs::Header *header);
-//   int getCamCalibration(string dir_root, string camera_name, double* K,std::vector<double> & D,double *R,double* P);
-//   int getStaticTransform(string calib_filename, geometry_msgs::TransformStamped *ros_msgTf, std_msgs::Header *header, string camera_name = "");
-//   int getGPS(string filename, sensor_msgs::NavSatFix *ros_msgGpsFix, std_msgs::Header *header);
-//   int getIMU(string filename, sensor_msgs::Imu *ros_msgImu, std_msgs::Header *header);
-//   int getOdomTf(string filename, nav_msgs::Odometry *ros_msgOdom, geometry_msgs::TransformStamped *ros_msgTf, std_msgs::Header *header);
-//   std_msgs::Header parseTime(string timestamp);
-//   void publishClockThread(ros::Publisher &clock_pub, rosgraph_msgs::Clock &clock_msg;, boost::mutex &clock_lock, ros::WallRate clock_rate);
 
 private:
   ros::NodeHandle& n_;
@@ -175,22 +167,6 @@ private:
     fd_set  stdin_fdset_;
 #endif
     int     maxfd_;
-
-
-//   // terminal and user input methods
-//   void setupTerminal();
-// 	void restoreTerminal();
-//   int readCharFromStdin();
-
-//     bool    terminal_modified_;
-// #if defined(_MSC_VER)
-//     HANDLE input_handle;
-//     DWORD stdin_set;
-// #else
-//     termios orig_flags_;
-//     fd_set  stdin_fdset_;
-// #endif
-//     int     maxfd_;
 
 };
 
