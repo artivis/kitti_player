@@ -250,7 +250,7 @@ ros::Time parseTime(string timestamp)
     time_t timeSinceEpoch = mktime(&t);
 
     stamp.sec  = timeSinceEpoch;
-    stamp.nsec = boost::lexical_cast<int>(timestamp.substr(20,8));
+    stamp.nsec = boost::lexical_cast<int>(timestamp.substr(20, string::npos));
 
     return stamp;
 }
