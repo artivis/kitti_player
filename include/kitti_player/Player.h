@@ -147,10 +147,6 @@ private:
   rosgraph_msgs::Clock clock_msg_;
   bool has_clock_msg_;
 
-
-  typedef pcl::PointCloud<pcl::PointXYZI> PointCloud;
-  PointCloud::Ptr points_;
-
   bool paused_;
   bool step_;
   bool quit_;

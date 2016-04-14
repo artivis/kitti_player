@@ -106,7 +106,7 @@ Player::Player(ros::NodeHandle& n, ros::NodeHandle& pn, PlayerOptions options)
         pub03_ = it.advertiseCamera("color/right/image_rect", 1);
     }
     if(options_.all_data || options_.velodyne)
-        map_pub_ = pn_.advertise<pcl::PointCloud<pcl::PointXYZ> > ("hdl64e", 1, true);
+        map_pub_ = pn_.advertise<sensor_msgs::PointCloud2> ("hdl64e", 1, true);
     if(options_.all_data || options_.gps)
         gps_pub_ = pn_.advertise<sensor_msgs::NavSatFix>  ("oxts/gps", 1, true);
     if(options_.all_data || options_.imu)
@@ -539,11 +539,7 @@ void Player::publishVelodyneDataAt(unsigned int entry)
         return;
     }
 
-    std_msgs::Header header_support;
-    header_support.frame_id = options_.frame_velodyne;
-    header_support.stamp = current_timestamp_;
-
-    points_.reset(new PointCloud);
+    pcl::PointCloud<pcl::PointXYZI> points;
 
     ROS_DEBUG_STREAM ("reading " << full_filename_velodyne);
     input.seekg(0, ios::beg);
@@ -552,17 +548,18 @@ void Player::publishVelodyneDataAt(unsigned int entry)
         pcl::PointXYZI point;
         input.read((char *) &point.x, 3*sizeof(float));
         input.read((char *) &point.intensity, sizeof(float));
-        points_->push_back(point);
+        points.push_back(point);
     }
     input.close();
 
-    //workaround for the PCL headers... http://wiki.ros.org/hydro/Migration#PCL
-    sensor_msgs::PointCloud2 pc2;
-    pc2.header.frame_id= header_support.frame_id;
-    pc2.header.stamp=header_support.stamp;
-    points_->header = pcl_conversions::toPCL(pc2.header);
+    // convert from pcl to sensor_msg 
+    sensor_msgs::PointCloud2 points_msg;
+    pcl::toROSMsg(points, points_msg);
+    // fill up header
+    points_msg.header.frame_id = options_.frame_velodyne;
+    points_msg.header.stamp = current_timestamp_;
 
-    map_pub_.publish(points_);
+    map_pub_.publish(points_msg);
 }
 
 void Player::publishColorDataAt(unsigned int entry)
