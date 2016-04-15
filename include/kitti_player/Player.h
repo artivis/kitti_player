@@ -121,6 +121,17 @@ private:
   ros::Publisher imu_pub_;
   ros::Publisher odom_pub_;
 
+  uint32_t image00_seq_;
+  uint32_t image01_seq_;
+  uint32_t image02_seq_;
+  uint32_t image03_seq_;
+  uint32_t velodyne_seq_;
+  uint32_t gps_seq_;
+  uint32_t imu_seq_;
+  uint32_t odom_seq_;
+  uint32_t tf_seq_;
+  uint32_t static_tf_seq_;
+
   boost::thread                 tf_thread_;
   boost::mutex                  tf_lock_;
   tf2_ros::TransformBroadcaster tf_br_;

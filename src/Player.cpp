@@ -56,6 +56,16 @@ Player::Player(ros::NodeHandle& n, ros::NodeHandle& pn, PlayerOptions options)
  : n_(n),
    pn_(pn),
    options_(options),
+   image00_seq_(0),
+   image01_seq_(0),
+   image02_seq_(0),
+   image03_seq_(0),
+   velodyne_seq_(0),
+   gps_seq_(0),
+   imu_seq_(0),
+   odom_seq_(0),
+   tf_seq_(0),
+   static_tf_seq_(0),
    has_tf_msg_(false),
    static_tf_published_(false),
    has_clock_msg_(false),
@@ -563,6 +573,7 @@ void Player::loadOdometryDataAt(unsigned int entry)
     {
         geometry_msgs::TransformStamped tf_stamped_msg;
         tf_stamped_msg.header.stamp = current_timestamp_;
+        tf_stamped_msg.header.seq = tf_seq_++;
         tf_stamped_msg.header.frame_id = options_.frame_odom;
         tf_stamped_msg.child_frame_id = options_.frame_oxts;
         tf2::convert(t,tf_stamped_msg.transform);
@@ -576,6 +587,7 @@ void Player::loadOdometryDataAt(unsigned int entry)
     // fill up the odometry msg
     odom_msg_.header.frame_id = options_.frame_odom;
     odom_msg_.header.stamp = current_timestamp_;
+    odom_msg_.header.seq = odom_seq_++;
 
     odom_msg_.child_frame_id = options_.frame_oxts;
 
@@ -594,6 +606,7 @@ void Player::loadImuDataAt(unsigned int entry)
     std_msgs::Header header_support;
     header_support.frame_id = options_.frame_oxts;
     header_support.stamp = current_timestamp_;
+    header_support.seq = imu_seq_++;
 
     string full_filename_oxts = (fs::path(dir_oxts_) / fs::path(boost::str(boost::format("%010d") % entry ) + ".txt")).string();
     if (!PlayerSupport::getIMU(full_filename_oxts,&imu_msg_,&header_support))
@@ -609,6 +622,7 @@ void Player::loadGpsDataAt(unsigned int entry)
     std_msgs::Header header_support;
     header_support.frame_id = options_.frame_oxts;
     header_support.stamp = current_timestamp_;
+    header_support.seq = gps_seq_++;
 
     string full_filename_oxts = (fs::path(dir_oxts_) / fs::path(boost::str(boost::format("%010d") % entry ) + ".txt")).string();
     if (!PlayerSupport::getGPS(full_filename_oxts,&gps_msg_,&header_support))
@@ -648,6 +662,7 @@ void Player::loadVelodyneDataAt(unsigned int entry)
     // fill up header
     points_msg_.header.frame_id = options_.frame_velodyne;
     points_msg_.header.stamp = current_timestamp_;
+    points_msg_.header.seq = velodyne_seq_++;
 }
 
 void Player::loadColorDataAt(unsigned int entry)
@@ -669,11 +684,13 @@ void Player::loadColorDataAt(unsigned int entry)
 
     ros_msg02_.header.stamp = ros_cameraInfoMsg_camera02_.header.stamp = cv_bridge_img_.header.stamp = current_timestamp_;
     cv_bridge_img_.header.frame_id = options_.frame_image02;
+    cv_bridge_img_.header.seq = image02_seq_++;
     cv_bridge_img_.image = cv_image02_;
     cv_bridge_img_.toImageMsg(ros_msg02_);
 
     ros_msg03_.header.stamp = ros_cameraInfoMsg_camera03_.header.stamp = cv_bridge_img_.header.stamp = current_timestamp_;
     cv_bridge_img_.header.frame_id = options_.frame_image03;
+    cv_bridge_img_.header.seq = image03_seq_++;
     cv_bridge_img_.image = cv_image03_;
     cv_bridge_img_.toImageMsg(ros_msg03_);
 }
@@ -697,11 +714,13 @@ void Player::loadGrayscaleDataAt(unsigned int entry)
 
     ros_msg00_.header.stamp = ros_cameraInfoMsg_camera00_.header.stamp = cv_bridge_img_.header.stamp = current_timestamp_;
     cv_bridge_img_.header.frame_id = options_.frame_image00;
+    cv_bridge_img_.header.seq = image00_seq_++;
     cv_bridge_img_.image = cv_image00_;
     cv_bridge_img_.toImageMsg(ros_msg00_);
 
     ros_msg01_.header.stamp = ros_cameraInfoMsg_camera01_.header.stamp = cv_bridge_img_.header.stamp = current_timestamp_;
     cv_bridge_img_.header.frame_id = options_.frame_image01;
+    cv_bridge_img_.header.seq = image01_seq_++;
     cv_bridge_img_.image = cv_image01_;
     cv_bridge_img_.toImageMsg(ros_msg01_);
 }
@@ -783,66 +802,71 @@ void Player::loadStaticTfs()
     // header_support.stamp = ros::Time::now();
     header_support.stamp = current_timestamp_;
 
-    geometry_msgs::TransformStamped ros_msgTf;
+    geometry_msgs::TransformStamped tf_stamped_msg;
 
     // velodyne
     header_support.frame_id = options_.frame_oxts;
-    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_imu_to_velo.txt")).string(), &ros_msgTf, &header_support))
+    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_imu_to_velo.txt")).string(), &tf_stamped_msg, &header_support))
     {
         ROS_WARN_STREAM("Static transform from IMU/VELODYNE could not be loaded");
     }
     else
     {
-        ros_msgTf.child_frame_id = options_.frame_velodyne;
-        static_tf_msg_.transforms.push_back(ros_msgTf);
+        tf_stamped_msg.child_frame_id = options_.frame_velodyne;
+        tf_stamped_msg.header.seq = static_tf_seq_++;
+        static_tf_msg_.transforms.push_back(tf_stamped_msg);
     }
 
     // image00
     header_support.frame_id = options_.frame_velodyne;
-    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_velo_to_cam.txt")).string(), &ros_msgTf, &header_support))
+    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_velo_to_cam.txt")).string(), &tf_stamped_msg, &header_support))
     {
         ROS_WARN_STREAM("Static transform from VELODYNE/CAMERA00 could not be loaded");
     }
     else
     {
-        ros_msgTf.child_frame_id = options_.frame_image00;
-        static_tf_msg_.transforms.push_back(ros_msgTf);
+        tf_stamped_msg.child_frame_id = options_.frame_image00;
+        tf_stamped_msg.header.seq = static_tf_seq_++;
+        static_tf_msg_.transforms.push_back(tf_stamped_msg);
     }
 
     // image01
     header_support.frame_id = options_.frame_image00;
-    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_cam_to_cam.txt")).string(), &ros_msgTf, &header_support, "01"))
+    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_cam_to_cam.txt")).string(), &tf_stamped_msg, &header_support, "01"))
     {
         ROS_WARN_STREAM("Static transform from CAMERA00/CAMERA01 could not be loaded");
     }
     else
     {
-        ros_msgTf.child_frame_id = options_.frame_image01;
-        static_tf_msg_.transforms.push_back(ros_msgTf);
+        tf_stamped_msg.child_frame_id = options_.frame_image01;
+        tf_stamped_msg.header.seq = static_tf_seq_++;
+        static_tf_msg_.transforms.push_back(tf_stamped_msg);
     }
 
     // image02
     header_support.frame_id = options_.frame_image00;
-    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_cam_to_cam.txt")).string(), &ros_msgTf, &header_support, "02"))
+    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_cam_to_cam.txt")).string(), &tf_stamped_msg, &header_support, "02"))
     {
         ROS_WARN_STREAM("Static transform from CAMERA00/CAMERA02 could not be loaded");
     }
     else
     {
-        ros_msgTf.child_frame_id = options_.frame_image02;
-        static_tf_msg_.transforms.push_back(ros_msgTf);
+        tf_stamped_msg.child_frame_id = options_.frame_image02;
+        tf_stamped_msg.header.seq = static_tf_seq_++;
+        static_tf_msg_.transforms.push_back(tf_stamped_msg);
     }
 
     // image03
     header_support.frame_id = options_.frame_image00;
-    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_cam_to_cam.txt")).string(), &ros_msgTf, &header_support, "03"))
+    if(!PlayerSupport::getStaticTransform((fs::path(dir_root_)/fs::path("calib_cam_to_cam.txt")).string(), &tf_stamped_msg, &header_support, "03"))
     {
         ROS_WARN_STREAM("Static transform from CAMERA00/CAMERA03 could not be loaded");
     }
     else
     {
-        ros_msgTf.child_frame_id = options_.frame_image03;
-        static_tf_msg_.transforms.push_back(ros_msgTf);
+        tf_stamped_msg.child_frame_id = options_.frame_image03;
+        tf_stamped_msg.header.seq = static_tf_seq_++;
+        static_tf_msg_.transforms.push_back(tf_stamped_msg);
     }
 }
 
