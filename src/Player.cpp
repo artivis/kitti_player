@@ -350,6 +350,15 @@ void Player::writeBag()
             static_tf_published_ = true;
         }
 
+        if(options_.odometry || options_.odomtf)
+        {
+            loadOdometryDataAt(entries_played_);
+            if(options_.odometry)
+                bag.write(ros::names::resolve("~odometry"), current_timestamp_, odom_msg_);
+            if(options_.odomtf)
+                bag.write("tf", current_timestamp_, tf_msg_);
+        }
+
         if(options_.color || options_.all_data)
         {
             loadColorDataAt(entries_played_);
@@ -384,15 +393,6 @@ void Player::writeBag()
         {
             loadImuDataAt(entries_played_);
             bag.write(ros::names::resolve("~oxts/imu"), current_timestamp_, imu_msg_);
-        }
-
-        if(options_.odometry || options_.odomtf)
-        {
-            loadOdometryDataAt(entries_played_);
-            if(options_.odometry)
-                bag.write(ros::names::resolve("~odometry"), current_timestamp_, odom_msg_);
-            if(options_.odomtf)
-                bag.write("tf", current_timestamp_, tf_msg_);
         }
 
         ++progress;
