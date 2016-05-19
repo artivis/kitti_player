@@ -13,7 +13,7 @@ int main(int argc, char **argv)
     PlayerOptions options;
     po::variables_map vm;
 
-    po::options_description desc("Kitti_player, a player for KITTI raw datasets\nDatasets can be downloaded from: http://www.cvlibs.net/datasets/kitti/raw_data.php\n\nAllowed options",200);
+    po::options_description desc("Kitti_player, a player for KITTI visual odometry datasets\nDatasets can be downloaded from: http://www.cvlibs.net/datasets/kitti/eval_odometry.php\n\nAllowed options",200);
     desc.add_options()
         ("help,h"                                                                                            ,  "help message")
         ("directory,d"   ,  po::value<string>(&options.path)->required()                                     ,  "*required* - path to the kitti dataset Directory")

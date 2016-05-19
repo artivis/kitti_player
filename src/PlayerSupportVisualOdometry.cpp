@@ -78,10 +78,8 @@ int getCamCalibration(string dir_calib, string camera_name, double* K,std::vecto
     }
 
     //We don't have K in calib.txt so => Rotation Matrix of P
-    for(int i=0;i<12;i++){
-        if(i!=3 && i!=7 && i!=11)
-            K[i]=P[i];
-
+    for(int i=0;i<9;i++){
+        K[i]=P[i+(i/3)];
     }
 
     //We don't have D in calib.txt so => all parameters to 0
@@ -125,7 +123,9 @@ bool getTimestamp(string dir_timestamp,vector<ros::Time> &times)
  */
 bool get_poses(string dir_root,string sequence,vector<Eigen::Matrix3d> &rotations,vector<geometry_msgs::Point> &pts){
 
-    string infile =dir_root+"poses/"+sequence+".txt";
+    string poseFile=sequence+".txt";
+
+    string infile =(fs::path(dir_root) / fs::path("poses") /poseFile).string();
     fstream input(infile.c_str());
     string line;
     if(!input.good())
