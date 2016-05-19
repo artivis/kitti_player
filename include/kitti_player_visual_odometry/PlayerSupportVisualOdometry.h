@@ -52,7 +52,7 @@
 
 using namespace std;
 
-namespace PlayerSupport_visual_odometry
+namespace PlayerSupportVisualOdometry
 {
 
 // Read camera calibration values and return by argument

@@ -2,7 +2,7 @@
 #define _KITTI_PLAYER_H_
 
 
-#include <kitti_player_visual_odometry/PlayerSupport_visual_odometry.h>
+#include <kitti_player_visual_odometry/PlayerSupportVisualOdometry.h>
 
 
 
@@ -30,11 +30,11 @@ struct PlayerOptions
     void printRequiredDirectoryTree();
 };
 
-class Player_visual_odometry
+class PlayerVisualOdometry
 {
 public:
-    Player_visual_odometry(ros::NodeHandle& n, ros::NodeHandle& pn, PlayerOptions options);
-    ~Player_visual_odometry();
+    PlayerVisualOdometry(ros::NodeHandle& n, ros::NodeHandle& pn, PlayerOptions options);
+    ~PlayerVisualOdometry();
 	
   void publish();
   void writeBag();

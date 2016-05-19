@@ -1,4 +1,4 @@
-#include <kitti_player_visual_odometry/Player_visual_odometry.h>
+#include <kitti_player_visual_odometry/PlayerVisualOdometry.h>
 
 
 using namespace std;
@@ -23,7 +23,7 @@ void PlayerOptions::printRequiredDirectoryTree()
     cout << "        ├── XX.txt               " << endl;
 }
 
-Player_visual_odometry::Player_visual_odometry(ros::NodeHandle& n, ros::NodeHandle& pn, PlayerOptions options)
+PlayerVisualOdometry::PlayerVisualOdometry(ros::NodeHandle& n, ros::NodeHandle& pn, PlayerOptions options)
  : n_(n),
    pn_(pn),
    options_(options),
@@ -34,13 +34,13 @@ Player_visual_odometry::Player_visual_odometry(ros::NodeHandle& n, ros::NodeHand
    terminal_modified_(false)
 {
 
-    dir_root_             = fs::path(options_.path).string();
-    dir_sequence_         = dir_root_+"sequences/"+options.sequence+"/";
-    dir_image00_          = dir_sequence_+"image_0/";
-    dir_image01_          = dir_sequence_+"image_1/";
-    dir_image02_          = dir_sequence_+"image_2/";
-    dir_image03_          = dir_sequence_+"image_3/";
-    dir_velodyne_points_  = dir_sequence_+"velodyne/";
+    dir_root_             = options_.path;
+    dir_sequence_         = (fs::path(dir_root_) / fs::path("sequences") / fs::path(options.sequence)).string();
+    dir_image00_          = (fs::path(dir_sequence_) / fs::path("image_0")).string();
+    dir_image01_          = (fs::path(dir_sequence_) / fs::path("image_1")).string();
+    dir_image02_          = (fs::path(dir_sequence_) / fs::path("image_2")).string();
+    dir_image03_          = (fs::path(dir_sequence_) / fs::path("image_3")).string();
+    dir_velodyne_points_  = (fs::path(dir_sequence_) / fs::path("velodyne")).string();
 
 
     ROS_INFO_STREAM ("Checking directories...");
@@ -77,10 +77,10 @@ Player_visual_odometry::Player_visual_odometry(ros::NodeHandle& n, ros::NodeHand
     if(options_.poses || options_.all_data){
         std::cout << __LINE__ <<endl;
         pose_pub = pn_.advertise<geometry_msgs::PoseStamped>  ("pose", 1, true);
-        have_pose=PlayerSupport_visual_odometry::get_poses(dir_root_,options_.sequence,rotations,pts);
+        have_pose=PlayerSupportVisualOdometry::get_poses(dir_root_,options_.sequence,rotations,pts);
     }
     if(options_.timestamps){
-        options_.timestamps=PlayerSupport_visual_odometry::getTimestamp(dir_sequence_,timestamps);
+        options_.timestamps=PlayerSupportVisualOdometry::getTimestamp(dir_sequence_,timestamps);
     }
     ROS_INFO_STREAM("Waiting 0.2 seconds after advertising topics...");
     ros::WallDuration(0.2).sleep();
@@ -117,8 +117,8 @@ Player_visual_odometry::Player_visual_odometry(ros::NodeHandle& n, ros::NodeHand
         ros_cameraInfoMsg_camera01_.header.frame_id = options_.frame_image01;
         ros_cameraInfoMsg_camera01_.height = 0;
         ros_cameraInfoMsg_camera01_.width  = 0;
-        if(!( PlayerSupport_visual_odometry::getCamCalibration(dir_sequence_,"0",ros_cameraInfoMsg_camera00_.K.data(),ros_cameraInfoMsg_camera00_.D,ros_cameraInfoMsg_camera00_.R.data(),ros_cameraInfoMsg_camera00_.P.data()) &&
-              PlayerSupport_visual_odometry::getCamCalibration(dir_sequence_,"1",ros_cameraInfoMsg_camera01_.K.data(),ros_cameraInfoMsg_camera01_.D,ros_cameraInfoMsg_camera01_.R.data(),ros_cameraInfoMsg_camera01_.P.data())
+        if(!( PlayerSupportVisualOdometry::getCamCalibration(dir_sequence_,"0",ros_cameraInfoMsg_camera00_.K.data(),ros_cameraInfoMsg_camera00_.D,ros_cameraInfoMsg_camera00_.R.data(),ros_cameraInfoMsg_camera00_.P.data()) &&
+              PlayerSupportVisualOdometry::getCamCalibration(dir_sequence_,"1",ros_cameraInfoMsg_camera01_.K.data(),ros_cameraInfoMsg_camera01_.D,ros_cameraInfoMsg_camera01_.R.data(),ros_cameraInfoMsg_camera01_.P.data())
             )
           )
         {
@@ -141,8 +141,8 @@ Player_visual_odometry::Player_visual_odometry(ros::NodeHandle& n, ros::NodeHand
         ros_cameraInfoMsg_camera03_.header.frame_id = options_.frame_image03;
         ros_cameraInfoMsg_camera03_.height = 0;
         ros_cameraInfoMsg_camera03_.width  = 0;
-        if(!(  PlayerSupport_visual_odometry::getCamCalibration(dir_sequence_,"2",ros_cameraInfoMsg_camera02_.K.data(),ros_cameraInfoMsg_camera02_.D,ros_cameraInfoMsg_camera02_.R.data(),ros_cameraInfoMsg_camera02_.P.data()) &&
-               PlayerSupport_visual_odometry::getCamCalibration(dir_sequence_,"3",ros_cameraInfoMsg_camera03_.K.data(),ros_cameraInfoMsg_camera03_.D,ros_cameraInfoMsg_camera03_.R.data(),ros_cameraInfoMsg_camera03_.P.data())
+        if(!(  PlayerSupportVisualOdometry::getCamCalibration(dir_sequence_,"2",ros_cameraInfoMsg_camera02_.K.data(),ros_cameraInfoMsg_camera02_.D,ros_cameraInfoMsg_camera02_.R.data(),ros_cameraInfoMsg_camera02_.P.data()) &&
+               PlayerSupportVisualOdometry::getCamCalibration(dir_sequence_,"3",ros_cameraInfoMsg_camera03_.K.data(),ros_cameraInfoMsg_camera03_.D,ros_cameraInfoMsg_camera03_.R.data(),ros_cameraInfoMsg_camera03_.P.data())
             )
           )
         {
@@ -159,7 +159,7 @@ Player_visual_odometry::Player_visual_odometry(ros::NodeHandle& n, ros::NodeHand
     }
 }
 
-Player_visual_odometry::~Player_visual_odometry()
+PlayerVisualOdometry::~PlayerVisualOdometry()
 {
     if(options_.viewer)
     {
@@ -174,36 +174,53 @@ Player_visual_odometry::~Player_visual_odometry()
     restoreTerminal();
 }
 
-int Player_visual_odometry::checkAllDirectories()
+int PlayerVisualOdometry::checkAllDirectories()
 {
     // Return non-zero if directory tree is wrong
+
+    bool dir_image00_ok =         fs::exists(fs::path(dir_image00_))         && fs::is_directory(fs::path(dir_image00_));
+    bool dir_image01_ok =         fs::exists(fs::path(dir_image01_))         && fs::is_directory(fs::path(dir_image01_));
+    bool dir_image02_ok =         fs::exists(fs::path(dir_image02_))         && fs::is_directory(fs::path(dir_image02_));
+    bool dir_image03_ok =         fs::exists(fs::path(dir_image03_))         && fs::is_directory(fs::path(dir_image03_));
+    bool dir_velodyne_points_ok = fs::exists(fs::path(dir_velodyne_points_)) && fs::is_directory(fs::path(dir_velodyne_points_));
+    bool dir_sequence_ok =        fs::exists(fs::path(dir_sequence_))        && fs::is_directory(fs::path(dir_sequence_));
+
     if (
-            (options_.all_data   && (   (!fs::exists(fs::path(dir_image00_))         || !fs::is_directory(fs::path(dir_image00_))) ||
-                                        (!fs::exists(fs::path(dir_image01_))         || !fs::is_directory(fs::path(dir_image01_))) ||
-                                        (!fs::exists(fs::path(dir_image02_))         || !fs::is_directory(fs::path(dir_image02_))) ||
-                                        (!fs::exists(fs::path(dir_image03_))         || !fs::is_directory(fs::path(dir_image03_))) ||
-                                        (!fs::exists(fs::path(dir_velodyne_points_)) || !fs::is_directory(fs::path(dir_velodyne_points_)))
+            (options_.all_data   && (   !dir_image00_ok ||
+                                        !dir_image01_ok ||
+                                        !dir_image02_ok ||
+                                        !dir_image03_ok ||
+                                        !dir_velodyne_points_ok
                                     )
             )
             ||
-            (options_.color      && (   (!fs::exists(fs::path(dir_image02_)) || !fs::is_directory(fs::path(dir_image02_))) ||
-                                        (!fs::exists(fs::path(dir_image03_)) || !fs::is_directory(fs::path(dir_image03_)))
+            (options_.color      && (   !dir_image02_ok ||
+                                        !dir_image03_ok
                                     )
             )
             ||
-            (options_.grayscale  && (   (!fs::exists(fs::path(dir_image00_)) || !fs::is_directory(fs::path(dir_image00_))) ||
-                                        (!fs::exists(fs::path(dir_image01_)) || !fs::is_directory(fs::path(dir_image01_)))
+            (options_.grayscale  && (   !dir_image00_ok ||
+                                        !dir_image01_ok
                                     )
             )
             ||
 
-            (options_.velodyne   && (   (!fs::exists(fs::path(dir_velodyne_points_)) || !fs::is_directory(fs::path(dir_velodyne_points_)))))
+            (options_.velodyne   && (   !dir_velodyne_points_ok 
+                                    )
+            )
             ||
-            (options_.timestamps && (   (!fs::exists(fs::path(dir_sequence_))  || !fs::is_directory(fs::path(dir_sequence_)))
+            (options_.timestamps && (   !dir_sequence_ok
                                     )
             )
         )
     {
+        cerr << (dir_image00_ok ?         "" : string("Wrong image_00 dir: ") + dir_image00_         + string("\n")) << 
+                (dir_image01_ok ?         "" : string("Wrong image_01 dir: ") + dir_image01_         + string("\n")) << 
+                (dir_image02_ok ?         "" : string("Wrong image_02 dir: ") + dir_image02_         + string("\n")) << 
+                (dir_image03_ok ?         "" : string("Wrong image_03 dir: ") + dir_image03_         + string("\n")) << 
+                (dir_velodyne_points_ok ? "" : string("Wrong velodyne dir: ") + dir_velodyne_points_ + string("\n")) << 
+                (dir_sequence_ok ?        "" : string("Wrong sequence dir: ") + dir_sequence_        + string("\n"));
+
         return 1;
     }
 
@@ -211,7 +228,7 @@ int Player_visual_odometry::checkAllDirectories()
     return 0;
 }
 
-unsigned int Player_visual_odometry::countNumEntries()
+unsigned int PlayerVisualOdometry::countNumEntries()
 {
     // sync datasets have the same number of elements on each folder, so
     // we just need to count one of them.
@@ -257,7 +274,7 @@ unsigned int Player_visual_odometry::countNumEntries()
     return 0;
 }
 
-void Player_visual_odometry::writeBag()
+void PlayerVisualOdometry::writeBag()
 {
     rosbag::Bag bag;
     bag.open(options_.bagpath, rosbag::bagmode::Write);
@@ -315,13 +332,13 @@ void Player_visual_odometry::writeBag()
     quit_ = true;
 }
     
-void Player_visual_odometry::publish()
+void PlayerVisualOdometry::publish()
 {
     paused_ = options_.start_paused;
     ros::WallRate loop_rate(options_.frequency);
 
     if(options_.clock)
-        clock_thread_ = boost::thread( &Player_visual_odometry::clockThread, this );
+        clock_thread_ = boost::thread( &PlayerVisualOdometry::clockThread, this );
 
 
     setupTerminal();
@@ -422,7 +439,7 @@ void Player_visual_odometry::publish()
 
 
 
-void Player_visual_odometry::loadVelodyneDataAt(unsigned int entry)
+void PlayerVisualOdometry::loadVelodyneDataAt(unsigned int entry)
 {
     string full_filename_velodyne = (fs::path(dir_velodyne_points_) / fs::path(boost::str(boost::format("%006d") % entry ) + ".bin")).string();
     fstream input(full_filename_velodyne.c_str(), ios::in | ios::binary);
@@ -453,7 +470,7 @@ void Player_visual_odometry::loadVelodyneDataAt(unsigned int entry)
     points_msg_.header.stamp = current_timestamp_;
 }
 
-void Player_visual_odometry::loadColorDataAt(unsigned int entry)
+void PlayerVisualOdometry::loadColorDataAt(unsigned int entry)
 {
     string full_filename_image02 = (fs::path(dir_image02_) / fs::path(boost::str(boost::format("%006d") % entry ) + ".png")).string();
     string full_filename_image03 = (fs::path(dir_image03_) / fs::path(boost::str(boost::format("%006d") % entry ) + ".png")).string();
@@ -481,7 +498,7 @@ void Player_visual_odometry::loadColorDataAt(unsigned int entry)
     cv_bridge_img_.toImageMsg(ros_msg03_);
 }
 
-void Player_visual_odometry::loadGrayscaleDataAt(unsigned int entry)
+void PlayerVisualOdometry::loadGrayscaleDataAt(unsigned int entry)
 {
     string full_filename_image00 = (fs::path(dir_image00_) / fs::path(boost::str(boost::format("%006d") % entry ) + ".png")).string();
     string full_filename_image01 = (fs::path(dir_image01_) / fs::path(boost::str(boost::format("%006d") % entry ) + ".png")).string();
@@ -509,7 +526,7 @@ void Player_visual_odometry::loadGrayscaleDataAt(unsigned int entry)
     cv_bridge_img_.toImageMsg(ros_msg01_);
 }
 
-void Player_visual_odometry::loadPosesDataAt(unsigned int entry){
+void PlayerVisualOdometry::loadPosesDataAt(unsigned int entry){
     Eigen::Quaterniond q(rotations[entry]);
     geometry_msgs::Quaternion qu;
     qu.x=q.x();
@@ -522,12 +539,12 @@ void Player_visual_odometry::loadPosesDataAt(unsigned int entry){
     ros_pose.pose.orientation=qu;
 }
 
-ros::Time Player_visual_odometry::getTimestampAt(unsigned int entry)
+ros::Time PlayerVisualOdometry::getTimestampAt(unsigned int entry)
 {
     return timestamps[entry];
 }
 
-void Player_visual_odometry::clockThread()
+void PlayerVisualOdometry::clockThread()
 {
     // Setup publishing rate
     ros::WallRate clock_rate = ros::WallRate(100.0);
@@ -548,7 +565,7 @@ void Player_visual_odometry::clockThread()
 
 
 
-void Player_visual_odometry::processUserInput()
+void PlayerVisualOdometry::processUserInput()
 {
     bool charsleftorpaused = true;
     step_ = false;  quit_ = false;
@@ -570,7 +587,7 @@ void Player_visual_odometry::processUserInput()
     }
 }
 
-void Player_visual_odometry::setupTerminal() {
+void PlayerVisualOdometry::setupTerminal() {
     if (terminal_modified_)
         return;
 
@@ -612,7 +629,7 @@ void Player_visual_odometry::setupTerminal() {
 #endif
 }
 
-void Player_visual_odometry::restoreTerminal() {
+void PlayerVisualOdometry::restoreTerminal() {
     if (!terminal_modified_)
         return;
 
@@ -625,7 +642,7 @@ void Player_visual_odometry::restoreTerminal() {
     terminal_modified_ = false;
 }
 
-int Player_visual_odometry::readCharFromStdin() {
+int PlayerVisualOdometry::readCharFromStdin() {
 #ifdef __APPLE__
     fd_set testfd;
     FD_COPY(&stdin_fdset_, &testfd);

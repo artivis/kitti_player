@@ -1,4 +1,4 @@
-#include <kitti_player_visual_odometry/PlayerSupport_visual_odometry.h>
+#include <kitti_player_visual_odometry/PlayerSupportVisualOdometry.h>
 
 
 
@@ -6,7 +6,7 @@
 
 namespace fs = boost::filesystem;
 
-namespace PlayerSupport_visual_odometry
+namespace PlayerSupportVisualOdometry
 {
 
 int getCamCalibration(string dir_calib, string camera_name, double* K,std::vector<double> & D,double *R,double* P){
@@ -30,7 +30,7 @@ int getCamCalibration(string dir_calib, string camera_name, double* K,std::vecto
     //    double R[9];         // Rectification Matrix
     //    double P[12];        // Projection Matrix Rectified (u,v,w) = P * R * (x,y,z,q)
 
-    string calib=dir_calib+"calib.txt";
+    string calib=(fs::path(dir_calib) / "calib.txt").string();
     ifstream file_c(calib.c_str());
     if (!file_c.is_open())
         return false;
@@ -97,7 +97,7 @@ int getCamCalibration(string dir_calib, string camera_name, double* K,std::vecto
 bool getTimestamp(string dir_timestamp,vector<ros::Time> &times)
 {
     string str_support;
-    str_support = dir_timestamp + "times.txt";
+    str_support = (fs::path(dir_timestamp) / "times.txt").string();
     ifstream timestamps(str_support.c_str());
     double stamp;
     if (!timestamps.is_open())
@@ -167,4 +167,4 @@ bool get_poses(string dir_root,string sequence,vector<Eigen::Matrix3d> &rotation
 
 
 
-} // namespace PlayerSupport_visual_odometry
+} // namespace PlayerSupportVisualOdometry

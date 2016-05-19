@@ -1,4 +1,4 @@
-#include <kitti_player_visual_odometry/Player_visual_odometry.h>
+#include <kitti_player_visual_odometry/PlayerVisualOdometry.h>
 
 
 
@@ -76,7 +76,7 @@ int main(int argc, char **argv)
 	ros::NodeHandle n;
 	ros::NodeHandle pn("~");
 
-    Player_visual_odometry player(n, pn, options);
+    PlayerVisualOdometry player(n, pn, options);
 
     if (!options.bagpath.empty())
         player.writeBag();
