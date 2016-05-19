@@ -37,8 +37,14 @@ add_definitions(${PCL_DEFINITIONS})
 add_library(kitti src/Player.cpp src/PlayerSupport.cpp)
 target_link_libraries(kitti ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
+add_library(kitti_visual_odometry src/PlayerVisualOdometry.cpp src/PlayerSupportVisualOdometry.cpp)
+target_link_libraries(kitti_visual_odometry ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+
 add_executable(kitti_player src/kitti_player.cpp)
 target_link_libraries(kitti_player kitti)
 
 add_executable(kitti_static_transform_broadcaster src/kitti_static_transform_broadcaster.cpp)
 target_link_libraries(kitti_static_transform_broadcaster ${catkin_LIBRARIES})
+
+add_executable(kitti_player_visual_odometry src/kitti_player_visual_odometry.cpp)
+target_link_libraries(kitti_player_visual_odometry kitti_visual_odometry ${catkin_LIBRARIES} ${PCL_LIBRARIES})
