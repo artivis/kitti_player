@@ -279,6 +279,9 @@ void PlayerVisualOdometry::writeBag()
     rosbag::Bag bag;
     bag.open(options_.bagpath, rosbag::bagmode::Write);
 
+    ros::Time start = ros::Time::now();
+    float period(1./options_.frequency);
+
     setupTerminal();
     boost::progress_display progress(total_entries_) ;
     while(entries_played_<total_entries_ && !quit_ && ros::ok())
@@ -287,7 +290,10 @@ void PlayerVisualOdometry::writeBag()
 
         if(!ros::ok() || quit_)  break;
 
-        current_timestamp_ = getTimestampAt(entries_played_);
+        if(options_.timestamps)
+            current_timestamp_ = getTimestampAt(entries_played_);
+        else
+            current_timestamp_ = start + ros::Duration(float(entries_played_)*period);
 
         // do it once
 
@@ -354,7 +360,7 @@ void PlayerVisualOdometry::publish()
         // variable used to display time spent on the loop
         boost::timer t;
 
-        if(options_.timestamps || options_.clock)
+        if(options_.timestamps and options_.clock)
             current_timestamp_ = getTimestampAt(entries_played_);
         else
             current_timestamp_ = ros::Time::now();
