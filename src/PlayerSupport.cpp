@@ -17,7 +17,7 @@ namespace fs = boost::filesystem;
 namespace PlayerSupport
 {
 
-int getCamCalibration(string dir_root, string camera_name, double* K,std::vector<double> & D,double *R,double* P){
+int getCamCalibration(string dir_root, string camera_name, double* K,std::vector<double> & /*D*/,double *R,double* P){
 /*
  *   from: http://kitti.is.tue.mpg.de/kitti/devkit_raw_data.zip
  *   calib_cam_to_cam.txt: Camera-to-camera calibration
@@ -49,7 +49,7 @@ int getCamCalibration(string dir_root, string camera_name, double* K,std::vector
     boost::char_separator<char> sep{" "};
 
     string line="";
-    char index=0;
+    unsigned char index=0;
     tokenizer::iterator token_iterator;
 
     while (getline(file_c2c,line))
@@ -125,10 +125,11 @@ int getStaticTransform(string calib_filename, geometry_msgs::TransformStamped *r
     boost::char_separator<char> sep{" "};
 
     string line="";
-    char index=0;
+    unsigned char index=0;
     tokenizer::iterator token_iterator;
 
     tf2::Transform t;
+    t.setIdentity();
 
     while (getline(calib_file,line))
     {
@@ -380,6 +381,8 @@ int getOdomTf(string filename, tf2::Transform *tf2_tf)
     // set a transform from utm and orientation
     tf2_tf->setRotation(q);
     tf2_tf->setOrigin(tf2::Vector3(utmP.easting, utmP.northing, utmP.altitude));
+
+    return 1;
 }
 
 
